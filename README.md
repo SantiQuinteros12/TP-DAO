@@ -199,11 +199,12 @@ Recargo por estado físico en la devolución: deteriorado +$2.000, dañado +$15.
 | **Factory Method** | `domain/fabricas.py` | `CreadorPrestamo.crear()` fija el algoritmo y las validaciones comunes; las subclases deciden qué préstamo construir, qué validar y cómo ocupar el ejemplar. |
 | **Strategy** | `domain/multas.py` | La fórmula de multa varía por tipo de préstamo sin tocar `Prestamo` (Open/Closed). |
 | **Observer** | `domain/eventos.py`, `services/notificaciones.py` | Los cambios de estado generan eventos y los suscriptores crean notificaciones al socio. Agregar email o SMS implica sumar un suscriptor. |
+| **Strategy + Composite** | `domain/recomendacion.py` | Cada criterio de recomendación (género, autor, lectores afines, popularidad, disponibilidad) es una estrategia que puntúa un libro. `MotorRecomendacion` las combina con pesos; agregar un criterio no modifica el motor. |
 
 Otros principios aplicados:
 - **SRP**: entidades con sus invariantes, servicios con la orquestación, repositorios con la persistencia, routers con HTTP.
 - **DIP**: los servicios reciben la UoW, el reloj y el publicador por inyección.
-- **Value Objects**: `ISBN` (valida el dígito verificador) y `MovimientoRemito`.
+- **Value Objects**: `ISBN` (valida el dígito verificador), `MovimientoRemito`, `Direccion` (calle, altura, piso, barrio, ciudad, provincia y CP) y `Horario` / `FranjaHoraria` (días y horas de atención, sin superposiciones).
 
 ---
 
@@ -218,6 +219,8 @@ Otros principios aplicados:
 | Evitar duplicados | Sede (nombre), socio (DNI), libro (ISBN normalizado), ejemplar (código de inventario), reserva activa por socio y libro, un solo remito en curso por ejemplar. También hay `UNIQUE` en la base. |
 | Ejemplar de la sede de origen | Debe pertenecer a la sede origen y estar físicamente en ella |
 | Sedes dadas de baja | `Sede.verificar_operativa` en préstamos, reservas, alta de ejemplares, creación y despacho de remitos. Además, una sede no puede darse de baja con remitos en curso, préstamos abiertos o reservas activas. |
+| Formato de los datos | `domain/validaciones.py`: nombres y apellidos sin números, teléfonos sin letras (7 a 15 dígitos), emails con formato válido, DNI de 7 u 8 dígitos, código postal, año de publicación y longitudes máximas. El frontend replica las reglas (`composables/validacion.js`) para avisar campo por campo antes de enviar. |
+| Aviso anticipado de préstamo | `PrestamoService.evaluar_elegibilidad` (`GET /api/prestamos/elegibilidad/{socio_id}`): al elegir el socio, la pantalla informa si está inhabilitado, tiene vencidos o alcanzó el máximo, sin esperar a confirmar. |
 
 ---
 
@@ -232,7 +235,17 @@ Otros principios aplicados:
 5. **Logística**: tasa de envíos exitosos (recibidos sin incidencias sobre finalizados), tasa de incidencias,
    incidencias por tipo, tiempo promedio, mínimo y máximo de tránsito (despacho a recepción) por ruta, y envíos o recepciones por sede.
 
-Endpoints: `GET /api/reportes/{prestamos-activos|vencidos|libros-mas-solicitados|disponibilidad-sedes|logistica}`.
+6. **Tendencias del período**: préstamos por mes (locales e interbibliotecarios), actividad por sede, composición
+   (tortas) por tipo, estado, estado físico en devoluciones, tipo de remito, estado de ejemplares e incidencias,
+   préstamos por género, socios más activos y comparación de cada indicador contra el período anterior.
+
+Endpoints: `GET /api/reportes/{prestamos-activos|vencidos|libros-mas-solicitados|disponibilidad-sedes|logistica|tendencias}`.
+
+## Recomendaciones
+
+`GET /api/recomendaciones?socio_id=` devuelve el perfil de lectura del socio y los libros sugeridos con su
+afinidad (0 a 100), los motivos y dónde están disponibles. Sin historial se muestran las tendencias de la red.
+`GET /api/recomendaciones/similares/{isbn}` sugiere títulos parecidos a uno dado.
 
 ## Procesos opcionales incluidos
 

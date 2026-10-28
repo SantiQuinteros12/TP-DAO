@@ -20,7 +20,7 @@ from domain.repositorios import (RepositorioEjemplares, RepositorioLibros,
                                  RepositorioReservas, RepositorioSedes,
                                  RepositorioSocios, UnidadDeTrabajo)
 from domain.reserva import Reserva
-from domain.sede import Sede
+from domain.sede import Direccion, Horario, Sede
 from domain.socio import Socio
 from infrastructure.database import conectar
 
@@ -98,16 +98,20 @@ class RepositorioSQLite:
 
 class SedesSQLite(RepositorioSQLite, RepositorioSedes):
     tabla = "sedes"
-    columnas = ("nombre", "direccion", "telefono", "email", "horario",
-                "activa")
+    columnas = ("nombre", "direccion") + Direccion.CAMPOS + (
+        "telefono", "email", "horario", "activa")
 
     def _a_entidad(self, f):
-        return Sede(f["nombre"], f["direccion"], f["telefono"], f["email"],
-                    f["horario"], bool(f["activa"]), id=f["id"])
+        direccion = Direccion.desde_dict(
+            {c: f[c] for c in Direccion.CAMPOS})
+        return Sede(f["nombre"], direccion, f["telefono"], f["email"],
+                    Horario.desde_json(f["horario"]), bool(f["activa"]),
+                    id=f["id"])
 
     def _a_fila(self, s):
-        return (s.nombre, s.direccion, s.telefono, s.email, s.horario,
-                int(s.activa))
+        return ((s.nombre, s.direccion.texto)
+                + tuple(s.direccion.a_dict().values())
+                + (s.telefono, s.email, s.horario.a_json(), int(s.activa)))
 
     def listar(self, incluir_bajas=True):
         filtro = "" if incluir_bajas else "WHERE activa = 1"

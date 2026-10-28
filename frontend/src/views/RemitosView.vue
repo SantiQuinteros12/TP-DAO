@@ -35,7 +35,14 @@ async function cargarRemito(id) {
 }
 watch(() => route.params.id, (id) => cargarRemito(id), { immediate: true })
 
-const seleccionar = (r) => router.push(`/remitos/${r.id}`)
+const seleccionar = (r) => router.push({ path: `/remitos/${r.id}`, query: route.query })
+
+/** Flecha de retorno cuando se llegó desde otra pantalla (p. ej. un préstamo). */
+const ORIGENES = { '/prestamos': 'Volver a préstamos', '/catalogo': 'Volver al catálogo', '/': 'Volver a reportes' }
+const volver = computed(() => {
+  const ruta = route.query.volver
+  return ruta && ORIGENES[ruta] ? { ruta, texto: ORIGENES[ruta] } : null
+})
 
 /** Campos que pide cada acción (las validaciones finales son del backend). */
 const CAMPOS = {
@@ -58,7 +65,16 @@ function elegirAccion(nombre) {
   })
 }
 
+const requiereObservacion = computed(() => ['reportar_incidencia', 'cancelar'].includes(accion.value))
+const errorAccion = computed(() => {
+  if (datos.responsable && !/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'-]+$/.test(datos.responsable)) return 'El responsable sólo admite letras, espacios y puntos'
+  if (campos.value.includes('ubicacion') && datos.ubicacion.trim().length < 3) return 'Indicá la ubicación (mínimo 3 caracteres)'
+  if (requiereObservacion.value && datos.observacion.trim().length < 3) return 'La observación es obligatoria (mínimo 3 caracteres)'
+  return ''
+})
+
 async function confirmar() {
+  if (errorAccion.value) return
   const cuerpo = { responsable: datos.responsable }
   for (const c of campos.value) cuerpo[c] = datos[c]
   const actualizado = await ejecutar(
@@ -81,9 +97,11 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
+      <div class="titulo">
+        <RouterLink v-if="volver" :to="volver.ruta" class="volver">
+          <span class="flecha-volver" aria-hidden="true">←</span> {{ volver.texto }}
+        </RouterLink>
         <h1>Remitos y seguimiento</h1>
-        <p>Empaquetado, despacho, tránsito y recepción de ejemplares entre sedes, con historial completo.</p>
       </div>
     </header>
 
@@ -164,9 +182,9 @@ onMounted(async () => {
               </button>
             </div>
 
-            <form v-if="accion" class="form panel" @submit.prevent="confirmar">
-              <label class="field"><span>Responsable</span><input v-model="datos.responsable" placeholder="Nombre de quien registra" /></label>
-              <label v-if="campos.includes('ubicacion')" class="field"><span>Ubicación *</span><input v-model="datos.ubicacion" required placeholder="Ej.: Centro de distribución" /></label>
+            <form v-if="accion" class="form panel" novalidate @submit.prevent="confirmar">
+              <label class="field"><span>Responsable</span><input v-model="datos.responsable" v-filtro="'autor'" maxlength="60" placeholder="Nombre de quien registra" /></label>
+              <label v-if="campos.includes('ubicacion')" class="field"><span>Ubicación <b class="req">*</b></span><input v-model="datos.ubicacion" maxlength="120" placeholder="Ej.: Centro de distribución" /></label>
               <label v-if="campos.includes('tipo_incidencia')" class="field">
                 <span>Tipo de incidencia *</span>
                 <select v-model="datos.tipo_incidencia">
@@ -180,12 +198,13 @@ onMounted(async () => {
                 </select>
               </label>
               <label class="field">
-                <span>Observación {{ ['reportar_incidencia', 'cancelar'].includes(accion) ? '*' : '' }}</span>
-                <textarea v-model="datos.observacion" rows="2" :required="['reportar_incidencia', 'cancelar'].includes(accion)" />
+                <span>Observación<b v-if="requiereObservacion" class="req"> *</b></span>
+                <textarea v-model="datos.observacion" rows="2" maxlength="300" />
               </label>
+              <p v-if="errorAccion" class="error-campo">{{ errorAccion }}</p>
               <div class="form-actions">
                 <button type="button" class="btn" @click="accion = null">Cancelar</button>
-                <button class="btn btn-primary">Confirmar: {{ ACCIONES_REMITO[accion] }}</button>
+                <button class="btn btn-primary" :disabled="!!errorAccion">Confirmar: {{ ACCIONES_REMITO[accion] }}</button>
               </div>
             </form>
           </div>
@@ -201,6 +220,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.titulo { display: grid; gap: 10px; }
 .detalle { position: sticky; top: 20px; }
 .ruta {
   display: flex; align-items: center; gap: 14px; padding: 12px 14px;

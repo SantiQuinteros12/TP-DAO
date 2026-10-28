@@ -2,6 +2,7 @@
 
 import re
 
+from domain import validaciones as v
 from domain.excepciones import DatoInvalidoError, ReglaNegocioError
 
 
@@ -41,13 +42,14 @@ class Socio:
         return f"{self.apellido}, {self.nombre}"
 
     def _validar(self):
-        if not (self.nombre or "").strip() or not (self.apellido or "").strip():
-            raise DatoInvalidoError("Nombre y apellido son obligatorios")
+        self.nombre = v.nombre_propio(self.nombre, "El nombre")
+        self.apellido = v.nombre_propio(self.apellido, "El apellido")
         self.documento = re.sub(r"[.\s]", "", str(self.documento or ""))
         if not re.fullmatch(r"\d{7,8}", self.documento):
-            raise DatoInvalidoError("El documento debe tener 7 u 8 dígitos")
-        if self.email and "@" not in self.email:
-            raise DatoInvalidoError("El email del socio no es válido")
+            raise DatoInvalidoError(
+                "El documento debe tener 7 u 8 dígitos, sin letras")
+        self.email = v.email(self.email)
+        self.telefono = v.telefono(self.telefono)
 
     def actualizar(self, nombre, apellido, documento, email, telefono):
         self.nombre = nombre
@@ -60,8 +62,9 @@ class Socio:
     def inhabilitar(self, motivo):
         if not self._habilitado:
             raise ReglaNegocioError("El socio ya se encuentra inhabilitado")
-        if not (motivo or "").strip():
-            raise DatoInvalidoError("Debe indicar el motivo de la inhabilitación")
+        if len((motivo or "").strip()) < 3:
+            raise DatoInvalidoError(
+                "Debe indicar el motivo de la inhabilitación (mín. 3 caracteres)")
         self._habilitado = False
         self._motivo_inhabilitacion = motivo.strip()
 

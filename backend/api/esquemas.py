@@ -7,12 +7,28 @@ from pydantic import BaseModel, Field
 from domain.enums import CondicionFisica, TipoIncidencia
 
 
+class DireccionIn(BaseModel):
+    calle: str
+    numero: str
+    piso_depto: str = ""
+    barrio: str = ""
+    ciudad: str
+    provincia: str
+    codigo_postal: str = ""
+
+
+class FranjaHorariaIn(BaseModel):
+    dias: list[int] = Field(min_length=1)
+    desde: str
+    hasta: str
+
+
 class SedeIn(BaseModel):
     nombre: str = Field(min_length=1, max_length=80)
-    direccion: str = Field(min_length=1, max_length=200)
+    direccion: DireccionIn
     telefono: str = ""
     email: str = ""
-    horario: str = ""
+    horario: list[FranjaHorariaIn] = []
 
 
 class SocioIn(BaseModel):

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 import config
 from main import crear_app
+from tests.conftest import direccion
 
 
 @pytest.fixture
@@ -16,9 +17,9 @@ def api(tmp_path, monkeypatch):
 
 def test_flujo_interbibliotecario_por_http(api):
     central = api.post("/api/sedes", json={"nombre": "Central",
-                                           "direccion": "Colón 1"}).json()
+                                           "direccion": direccion("Colón", "1")}).json()
     norte = api.post("/api/sedes", json={"nombre": "Norte",
-                                         "direccion": "Andes 2"}).json()
+                                         "direccion": direccion("Andes", "2")}).json()
     socio = api.post("/api/socios", json={"nombre": "Ana", "apellido": "Paz",
                                           "documento": "30111222"}).json()
     api.post("/api/libros", json={"isbn": "9780802130303",
@@ -62,8 +63,8 @@ def test_flujo_interbibliotecario_por_http(api):
 
 
 def test_errores_de_negocio_y_rollback(api):
-    api.post("/api/sedes", json={"nombre": "Central", "direccion": "x"})
-    r = api.post("/api/sedes", json={"nombre": "CENTRAL", "direccion": "y"})
+    api.post("/api/sedes", json={"nombre": "Central", "direccion": direccion("Calle x", "1")})
+    r = api.post("/api/sedes", json={"nombre": "CENTRAL", "direccion": direccion("Calle y", "2")})
     assert r.status_code == 409
     assert api.get("/api/sedes/99").status_code == 404
     r = api.post("/api/libros", json={"isbn": "123", "titulo": "t",

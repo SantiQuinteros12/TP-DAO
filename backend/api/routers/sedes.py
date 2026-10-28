@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from api import serializadores as ser
 from api.dependencias import servicio
 from api.esquemas import SedeIn
+from domain.sede import PROVINCIAS
 from services.sede_service import SedeService
 
 router = APIRouter(prefix="/api/sedes", tags=["Sedes"])
@@ -14,6 +15,11 @@ Servicio = Depends(servicio(SedeService))
 @router.get("")
 def listar(incluir_bajas: bool = True, svc: SedeService = Servicio):
     return [ser.sede(s) for s in svc.listar(incluir_bajas)]
+
+
+@router.get("/provincias")
+def provincias():
+    return list(PROVINCIAS)
 
 
 @router.get("/{sede_id}")

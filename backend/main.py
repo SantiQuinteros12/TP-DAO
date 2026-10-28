@@ -16,8 +16,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import config
 from api import errores
-from api.routers import (catalogo, prestamos, remitos, reportes, reservas,
-                         sedes, socios)
+from api.routers import (catalogo, prestamos, recomendaciones, remitos,
+                         reportes, reservas, sedes, socios)
 from infrastructure.database import inicializar_esquema
 
 
@@ -40,7 +40,7 @@ def crear_app():
                        allow_methods=["*"], allow_headers=["*"])
     errores.registrar(app)
     for modulo in (sedes, socios, catalogo, prestamos, reservas, remitos,
-                   reportes):
+                   reportes, recomendaciones):
         app.include_router(modulo.router)
     return app
 

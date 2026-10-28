@@ -8,6 +8,7 @@ const routes = [
   { path: '/catalogo', name: 'catalogo', component: () => import('../views/CatalogoView.vue'), meta: { titulo: 'Catálogo' } },
   { path: '/prestamos', name: 'prestamos', component: () => import('../views/PrestamosView.vue'), meta: { titulo: 'Préstamos' } },
   { path: '/reservas', name: 'reservas', component: () => import('../views/ReservasView.vue'), meta: { titulo: 'Reservas' } },
+  { path: '/recomendaciones', name: 'recomendaciones', component: () => import('../views/RecomendacionesView.vue'), meta: { titulo: 'Recomendaciones' } },
   { path: '/remitos/:id?', name: 'remitos', component: () => import('../views/RemitosView.vue'), meta: { titulo: 'Remitos' } }
 ]
 

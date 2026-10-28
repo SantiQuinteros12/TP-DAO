@@ -13,7 +13,7 @@ class SedeService(ServicioBase):
     def obtener(self, sede_id):
         return self._requerir(self.uow.sedes, sede_id, "Sede")
 
-    def crear(self, nombre, direccion, telefono="", email="", horario=""):
+    def crear(self, nombre, direccion, telefono="", email="", horario=()):
         sede = Sede(nombre, direccion, telefono, email, horario)
         self._validar_nombre_unico(sede.nombre)
         return self.uow.sedes.guardar(sede)

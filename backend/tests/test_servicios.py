@@ -8,7 +8,7 @@ from domain.excepciones import (DuplicadoError, ReglaNegocioError,
                                 TransicionInvalidaError)
 from infrastructure.consultas_sqlite import ConsultasSQLite
 from services.reporte_service import ReporteService
-from tests.conftest import ISBN_FICCIONES, ISBN_RAYUELA
+from tests.conftest import ISBN_FICCIONES, ISBN_RAYUELA, direccion
 
 
 class TestValidacionesDeNegocio:
@@ -22,7 +22,7 @@ class TestValidacionesDeNegocio:
             ctx.catalogo.crear_ejemplar(ISBN_FICCIONES, ctx.central.id,
                                         ctx.ej_central.codigo_inventario)
         with pytest.raises(DuplicadoError):
-            ctx.sedes.crear("central", "Otra dirección")
+            ctx.sedes.crear("central", direccion("Otra calle", "5"))
 
     def test_no_presta_a_socio_inhabilitado(self, ctx):
         ctx.socios.inhabilitar(ctx.ana.id, "Multas impagas")
@@ -204,3 +204,32 @@ class TestReportes:
         activos = reportes.prestamos_activos_y_transito()
         assert activos["totales"]["activos_interbib"] == 1
         assert reportes.disponibilidad_por_sede()
+
+        tendencias = reportes.tendencias()
+        assert tendencias["comparativa"]["actual"]["prestamos"] == 1
+        assert tendencias["prestamos_por_mes"][0]["interbibliotecarios"] == 1
+
+
+class TestElegibilidadYRecomendaciones:
+
+    def test_elegibilidad_anticipa_impedimentos(self, ctx):
+        assert ctx.prestamos.evaluar_elegibilidad(ctx.ana.id)[
+            "puede_solicitar"]
+        ctx.socios.inhabilitar(ctx.ana.id, "Multas impagas")
+        resultado = ctx.prestamos.evaluar_elegibilidad(ctx.ana.id)
+        assert not resultado["puede_solicitar"]
+        assert "inhabilitado" in resultado["impedimentos"][0]
+
+    def test_recomienda_por_autor_y_lectores_afines(self, ctx):
+        from services.recomendacion_service import RecomendacionService
+        ctx.catalogo.crear_libro("9788499089508", "El Aleph", "J. L. Borges",
+                                 genero="Cuentos")
+        aleph = ctx.catalogo.crear_ejemplar("9788499089508", ctx.central.id)
+        ctx.prestamos.solicitar(ctx.ana.id, ctx.ej_central.id,
+                                ctx.central.id, ctx.central.id)
+        svc = RecomendacionService(ConsultasSQLite(ctx.uow.conexion),
+                                   ctx.uow, ctx.reloj)
+        recomendados = svc.para_socio(ctx.ana.id)["recomendaciones"]
+        assert recomendados[0]["isbn"] == aleph.isbn
+        assert any("Borges" in m for m in recomendados[0]["motivos"])
+        assert ISBN_FICCIONES not in [r["isbn"] for r in recomendados]

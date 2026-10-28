@@ -14,6 +14,13 @@ from services.sede_service import SedeService
 from services.socio_service import SocioService
 
 ISBN_FICCIONES = "9780802130303"
+
+
+def direccion(calle="Av. Colón", numero="100"):
+    return {"calle": calle, "numero": numero, "ciudad": "Córdoba",
+            "provincia": "Córdoba"}
+
+
 ISBN_RAYUELA = "9788437604572"
 
 
@@ -33,8 +40,8 @@ class Contexto:
         self.reservas = ReservaService(*args)
         self.logistica = LogisticaService(*args)
 
-        self.central = self.sedes.crear("Central", "Av. Colón 100")
-        self.norte = self.sedes.crear("Norte", "Bv. Los Andes 50")
+        self.central = self.sedes.crear("Central", direccion("Av. Colón", "100"))
+        self.norte = self.sedes.crear("Norte", direccion("Bv. Los Andes", "50"))
         self.ana = self.socios.crear("Ana", "García", "30111222")
         self.beto = self.socios.crear("Beto", "López", "31222333")
         self.catalogo.crear_libro(ISBN_FICCIONES, "Ficciones", "J. L. Borges")

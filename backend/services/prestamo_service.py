@@ -128,15 +128,46 @@ class PrestamoService(ServicioBase):
             socio_id=prestamo.socio_id, multa=multa))
         return prestamo
 
-    def _validar_cupo_socio(self, socio):
-        hoy = self.reloj.hoy()
+    def evaluar_elegibilidad(self, socio_id):
+        """
+        Indica si el socio puede solicitar un préstamo ahora y, si no, por
+        qué. Permite avisar en la UI antes de completar la solicitud; las
+        mismas reglas se vuelven a aplicar al registrarla.
+        """
+        socio = self._requerir(self.uow.socios, socio_id, "Socio")
         abiertos = self.uow.prestamos.abiertos_de_socio(socio.id)
-        vencidos = [p for p in abiertos if p.esta_vencido(hoy)]
+        vencidos = [p for p in abiertos if p.esta_vencido(self.reloj.hoy())]
+        impedimentos = []
+        if not socio.habilitado:
+            impedimentos.append(
+                f"Está inhabilitado ({socio.motivo_inhabilitacion})")
+        impedimentos += self._impedimentos_de_cupo(abiertos, vencidos)
+        return {
+            "socio_id": socio.id,
+            "socio": socio.nombre_completo,
+            "puede_solicitar": not impedimentos,
+            "impedimentos": impedimentos,
+            "prestamos_abiertos": len(abiertos),
+            "prestamos_vencidos": len(vencidos),
+            "maximo_prestamos": MAX_PRESTAMOS_ABIERTOS,
+        }
+
+    @staticmethod
+    def _impedimentos_de_cupo(abiertos, vencidos):
+        impedimentos = []
         if vencidos:
-            raise ReglaNegocioError(
+            impedimentos.append(
                 f"El socio tiene {len(vencidos)} préstamo(s) vencido(s): "
                 "debe regularizarlos antes de solicitar otro")
         if len(abiertos) >= MAX_PRESTAMOS_ABIERTOS:
-            raise ReglaNegocioError(
+            impedimentos.append(
                 f"El socio alcanzó el máximo de {MAX_PRESTAMOS_ABIERTOS} "
                 "préstamos abiertos")
+        return impedimentos
+
+    def _validar_cupo_socio(self, socio):
+        abiertos = self.uow.prestamos.abiertos_de_socio(socio.id)
+        vencidos = [p for p in abiertos if p.esta_vencido(self.reloj.hoy())]
+        impedimentos = self._impedimentos_de_cupo(abiertos, vencidos)
+        if impedimentos:
+            raise ReglaNegocioError(impedimentos[0])

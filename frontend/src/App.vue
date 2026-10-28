@@ -10,6 +10,7 @@ const secciones = [
   { to: '/remitos', texto: 'Remitos', icono: '🚚' },
   { to: '/reservas', texto: 'Reservas', icono: '🔖' },
   { to: '/catalogo', texto: 'Catálogo', icono: '📚' },
+  { to: '/recomendaciones', texto: 'Recomendaciones', icono: '✨' },
   { to: '/socios', texto: 'Socios', icono: '👥' },
   { to: '/sedes', texto: 'Sedes', icono: '🏛️' }
 ]
@@ -27,7 +28,6 @@ const secciones = [
         <span class="logo">📚</span>
         <div>
           <strong>Red de Bibliotecas</strong>
-          <small>Préstamos interbibliotecarios</small>
         </div>
       </div>
       <nav>

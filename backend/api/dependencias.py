@@ -13,6 +13,7 @@ from domain.reloj import RelojSistema
 from infrastructure.consultas_sqlite import ConsultasSQLite
 from infrastructure.repositorios_sqlite import UnidadDeTrabajoSQLite
 from services.notificaciones import crear_publicador
+from services.recomendacion_service import RecomendacionService
 from services.reporte_service import ReporteService
 
 reloj = RelojSistema()
@@ -46,3 +47,7 @@ def obtener_consultas(uow=Depends(obtener_uow)):
 
 def obtener_reportes(consultas=Depends(obtener_consultas)):
     return ReporteService(consultas, reloj)
+
+
+def obtener_recomendaciones(uow=Depends(obtener_uow)):
+    return RecomendacionService(ConsultasSQLite(uow.conexion), uow, reloj)

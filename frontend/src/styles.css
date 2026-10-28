@@ -21,6 +21,8 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
 
   /* Estados: siempre con texto (nunca sólo color) */
   --good: #0ca30c;
@@ -63,6 +65,8 @@
     --series-2: #d95926;
     --series-3: #199e70;
     --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
     --good-ink: #4fc94f;
     --good-bg: #13291a;
     --warning-ink: #fab219;
@@ -96,6 +100,8 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
   --good-ink: #4fc94f;
   --good-bg: #13291a;
   --warning-ink: #fab219;
@@ -237,3 +243,59 @@ td.actions { text-align: right; white-space: nowrap; }
 }
 .alert.warning { background: var(--warning-bg); color: var(--warning-ink); }
 .alert.error { background: var(--critical-bg); color: var(--critical-ink); }
+.alert.ok { background: var(--good-bg); color: var(--good-ink); }
+.alert ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* ==========================================================================
+   Validación de formularios
+   ========================================================================== */
+.field .req { color: var(--critical-ink); font-weight: 600; }
+.field.invalido input, .field.invalido select, .field.invalido textarea {
+  border-color: var(--critical); background: var(--critical-bg);
+}
+.error-campo { font-size: 12px; color: var(--critical-ink); }
+.error-campo::before { content: '⚠ '; }
+
+/* Botón con flecha de retorno */
+.volver {
+  display: inline-flex; align-items: center; gap: 6px; width: fit-content;
+  padding: 6px 14px 6px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); font: inherit; font-weight: 500;
+  cursor: pointer; text-decoration: none;
+}
+.volver:hover { background: var(--surface-2); }
+.volver .flecha-volver { font-size: 18px; line-height: 1; }
+
+/* Chips de conteo por estado */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap;
+  background: var(--neutral-bg); color: var(--neutral-ink);
+}
+.chip strong { font-variant-numeric: tabular-nums; }
+.chip.cero { opacity: 0.45; }
+.chip.good { background: var(--good-bg); color: var(--good-ink); }
+.chip.info { background: var(--info-bg); color: var(--info-ink); }
+.chip.warning { background: var(--warning-bg); color: var(--warning-ink); }
+.chip.serious { background: var(--serious-bg); color: var(--serious-ink); }
+
+/* Enlace con apariencia de texto (p. ej. "Ver motivo") */
+.link {
+  border: 0; background: none; padding: 0; font: inherit; font-size: 12px;
+  color: var(--accent); cursor: pointer; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Tooltip de gráficos */
+.tooltip-grafico {
+  position: absolute; z-index: 5; pointer-events: none; min-width: 120px;
+  padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.45;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.16); transform: translate(-50%, calc(-100% - 10px));
+  white-space: nowrap;
+}
+.tooltip-grafico strong { display: block; margin-bottom: 2px; }
+.tooltip-grafico .linea { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.tooltip-grafico .linea b { margin-left: auto; padding-left: 10px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.muestra-color { width: 10px; height: 10px; border-radius: 3px; flex: none; }

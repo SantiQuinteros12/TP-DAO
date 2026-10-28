@@ -12,6 +12,7 @@ from domain.multas import MultaEscalonada, MultaLineal
 from domain.remito import ContextoTransicion, Remito
 from domain.sede import Sede
 from domain.socio import Socio
+from tests.conftest import direccion
 
 T0 = datetime(2026, 1, 1, 9, 0)
 
@@ -91,7 +92,7 @@ class TestValueObjectsYEntidades:
             ISBN("9780306406158")
 
     def test_sede_de_baja_no_opera(self):
-        sede = Sede("Sur", "Calle 1")
+        sede = Sede("Sur", direccion("Calle Uno", "1"))
         sede.dar_de_baja()
         with pytest.raises(ReglaNegocioError):
             sede.verificar_operativa()
@@ -116,3 +117,33 @@ class TestMultasStrategy:
     def test_recargo_por_dano(self):
         assert MultaLineal(500).calcular_total(
             0, CondicionFisica.DANADA) == 15000
+
+
+class TestValidacionesDeFormato:
+
+    def test_nombres_sin_numeros_y_telefono_sin_letras(self):
+        with pytest.raises(DatoInvalidoError, match="letras"):
+            Socio("Ana2", "Paz", "30111222")
+        with pytest.raises(DatoInvalidoError, match="teléfono"):
+            Socio("Ana", "Paz", "30111222", telefono="351-ABC")
+        with pytest.raises(DatoInvalidoError, match="email"):
+            Socio("Ana", "Paz", "30111222", email="ana@mail")
+        assert Socio("María José", "D'Angelo", "30111222",
+                     telefono="+54 (351) 456-7890").telefono
+
+    def test_horario_rechaza_franjas_superpuestas(self):
+        franjas = [{"dias": [0, 1], "desde": "08:00", "hasta": "13:00"},
+                   {"dias": [1], "desde": "12:00", "hasta": "18:00"}]
+        with pytest.raises(DatoInvalidoError, match="superpuestas"):
+            Sede("Sur", direccion(), horario=franjas)
+        sede = Sede("Sur", direccion(), horario=[
+            {"dias": [0, 1, 2, 3, 4], "desde": "08:00", "hasta": "20:00"},
+            {"dias": [5], "desde": "09:00", "hasta": "13:00"}])
+        assert sede.horario.texto == ("Lun a Vie 08:00 a 20:00 · "
+                                      "Sáb 09:00 a 13:00")
+
+    def test_direccion_valida_altura_y_provincia(self):
+        with pytest.raises(DatoInvalidoError, match="altura"):
+            Sede("Sur", direccion(numero="12a"))
+        with pytest.raises(DatoInvalidoError, match="Provincia"):
+            Sede("Sur", {**direccion(), "provincia": "Narnia"})

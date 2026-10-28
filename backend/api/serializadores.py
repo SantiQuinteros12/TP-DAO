@@ -17,8 +17,12 @@ def _campos(entidad, *nombres):
 
 
 def sede(s):
-    return _campos(s, "id", "nombre", "direccion", "telefono", "email",
-                   "horario", "activa")
+    datos = _campos(s, "id", "nombre", "telefono", "email", "activa")
+    datos.update(direccion=s.direccion.a_dict(),
+                 direccion_texto=s.direccion.texto,
+                 horario=s.horario.a_lista(),
+                 horario_texto=s.horario.texto)
+    return datos
 
 
 def socio(s):

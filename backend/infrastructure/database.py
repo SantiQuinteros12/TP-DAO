@@ -6,11 +6,18 @@ ESQUEMA = """
 CREATE TABLE IF NOT EXISTS sedes (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     nombre      TEXT    NOT NULL UNIQUE COLLATE NOCASE,
-    direccion   TEXT    NOT NULL,
-    telefono    TEXT    DEFAULT '',
-    email       TEXT    DEFAULT '',
-    horario     TEXT    DEFAULT '',
-    activa      INTEGER NOT NULL DEFAULT 1
+    direccion      TEXT    NOT NULL,          -- texto completo (lectura)
+    calle          TEXT    NOT NULL DEFAULT '',
+    numero         TEXT    NOT NULL DEFAULT '',
+    piso_depto     TEXT    DEFAULT '',
+    barrio         TEXT    DEFAULT '',
+    ciudad         TEXT    NOT NULL DEFAULT '',
+    provincia      TEXT    NOT NULL DEFAULT '',
+    codigo_postal  TEXT    DEFAULT '',
+    telefono       TEXT    DEFAULT '',
+    email          TEXT    DEFAULT '',
+    horario        TEXT    DEFAULT '[]',      -- JSON: franjas horarias
+    activa         INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS socios (
@@ -130,10 +137,34 @@ def conectar(ruta_db):
     return conexion
 
 
+# Columnas agregadas a ``sedes`` al estructurar la dirección.
+_COLUMNAS_DIRECCION = ("calle", "numero", "piso_depto", "barrio", "ciudad",
+                       "provincia", "codigo_postal")
+
+
+def _migrar(conexion):
+    """Adapta bases creadas con versiones anteriores del esquema."""
+    existentes = {f["name"] for f in
+                  conexion.execute("PRAGMA table_info(sedes)")}
+    faltantes = [c for c in _COLUMNAS_DIRECCION if c not in existentes]
+    for columna in faltantes:
+        conexion.execute(
+            f"ALTER TABLE sedes ADD COLUMN {columna} TEXT NOT NULL DEFAULT ''")
+    if faltantes:
+        # La dirección vieja era texto libre: se conserva como calle.
+        conexion.execute("""
+            UPDATE sedes SET calle = direccion, numero = 'S/N',
+                   ciudad = 'Córdoba', provincia = 'Córdoba'
+             WHERE calle = ''""")
+        conexion.execute(
+            "UPDATE sedes SET horario = '[]' WHERE horario NOT LIKE '[%'")
+
+
 def inicializar_esquema(ruta_db):
     conexion = conectar(ruta_db)
     try:
         conexion.executescript(ESQUEMA)
+        _migrar(conexion)
         conexion.commit()
     finally:
         conexion.close()

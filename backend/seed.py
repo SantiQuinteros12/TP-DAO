@@ -33,17 +33,35 @@ from services.socio_service import SocioService
 
 DIAS_SIMULADOS = 120
 
+def _dir(calle, numero, barrio, cp):
+    return {"calle": calle, "numero": numero, "barrio": barrio,
+            "ciudad": "Córdoba", "provincia": "Córdoba",
+            "codigo_postal": cp}
+
+
+def _franja(desde_dia, hasta_dia, desde, hasta):
+    return {"dias": list(range(desde_dia, hasta_dia + 1)),
+            "desde": desde, "hasta": hasta}
+
+
 SEDES = [
-    ("Biblioteca Central", "Av. Colón 1250, Córdoba", "0351-4331100",
-     "central@bibliored.org", "Lun a Vie 8 a 20 - Sáb 9 a 13"),
-    ("Sede Nueva Córdoba", "Bv. Illia 350, Córdoba", "0351-4605522",
-     "nuevacba@bibliored.org", "Lun a Vie 9 a 19"),
-    ("Sede Cerro de las Rosas", "Av. Rafael Núñez 4100, Córdoba",
-     "0351-4812233", "cerro@bibliored.org", "Lun a Vie 10 a 18"),
-    ("Sede Alta Córdoba", "Jerónimo Luis de Cabrera 690, Córdoba",
-     "0351-4710044", "altacba@bibliored.org", "Mar a Sáb 9 a 17"),
-    ("Sede Güemes", "Belgrano 820, Córdoba", "0351-4689900",
-     "guemes@bibliored.org", "Cerrada por remodelación"),
+    ("Biblioteca Central", _dir("Av. Colón", "1250", "Centro", "X5000"),
+     "0351-4331100", "central@bibliored.org",
+     [_franja(0, 4, "08:00", "20:00"), _franja(5, 5, "09:00", "13:00")]),
+    ("Sede Nueva Córdoba", _dir("Bv. Illia", "350", "Nueva Córdoba",
+                                "X5000"),
+     "0351-4605522", "nuevacba@bibliored.org",
+     [_franja(0, 4, "09:00", "19:00")]),
+    ("Sede Cerro de las Rosas", _dir("Av. Rafael Núñez", "4100",
+                                     "Cerro de las Rosas", "X5009"),
+     "0351-4812233", "cerro@bibliored.org",
+     [_franja(0, 4, "10:00", "18:00")]),
+    ("Sede Alta Córdoba", _dir("Jerónimo Luis de Cabrera", "690",
+                               "Alta Córdoba", "X5001"),
+     "0351-4710044", "altacba@bibliored.org",
+     [_franja(1, 5, "09:00", "17:00")]),
+    ("Sede Güemes", _dir("Belgrano", "820", "Güemes", "X5000"),
+     "0351-4689900", "guemes@bibliored.org", []),
 ]
 
 LIBROS = [
@@ -72,11 +90,52 @@ LIBROS = [
      "Alfaguara", 1963, "Novela"),
 ]
 
+def _isbn(base12):
+    """Completa un ISBN-13 de demostración con su dígito de control."""
+    suma = sum(int(c) * (1 if i % 2 == 0 else 3) for i, c in enumerate(base12))
+    return base12 + str((10 - suma % 10) % 10)
+
+
+LIBROS += [
+    (_isbn("978950070001"), "El túnel", "Ernesto Sabato", "Seix Barral",
+     1948, "Novela"),
+    (_isbn("978950070002"), "Bestiario", "Julio Cortázar", "Sudamericana",
+     1951, "Cuentos"),
+    (_isbn("978950070003"), "El libro de arena", "Jorge Luis Borges",
+     "Emecé", 1975, "Cuentos"),
+    (_isbn("978950070004"), "Crónica de una muerte anunciada",
+     "Gabriel García Márquez", "Sudamericana", 1981, "Novela"),
+    (_isbn("978950070005"), "Rebelión en la granja", "George Orwell",
+     "Debolsillo", 1945, "Distopía"),
+    (_isbn("978950070006"), "Fahrenheit 451", "Ray Bradbury", "Minotauro",
+     1953, "Distopía"),
+    (_isbn("978950070007"), "Un mundo feliz", "Aldous Huxley", "Debolsillo",
+     1932, "Distopía"),
+    (_isbn("978950070008"), "Facundo", "Domingo F. Sarmiento", "Eudeba",
+     1845, "Ensayo"),
+    (_isbn("978950070009"), "Operación masacre", "Rodolfo Walsh",
+     "De la Flor", 1957, "Ensayo"),
+    (_isbn("978950070010"), "Cuentos de la selva", "Horacio Quiroga",
+     "Losada", 1918, "Infantil"),
+    (_isbn("978950070011"), "Veinte poemas de amor", "Pablo Neruda",
+     "Seix Barral", 1924, "Poesía"),
+    (_isbn("978950070012"), "Hamlet", "William Shakespeare", "Austral",
+     1603, "Clásico"),
+    (_isbn("978950070013"), "La metamorfosis", "Franz Kafka", "Alianza",
+     1915, "Clásico"),
+    (_isbn("978950070014"), "El amor en los tiempos del cólera",
+     "Gabriel García Márquez", "Sudamericana", 1985, "Novela"),
+]
+
+
 # (índice de libro, índices de sedes donde hay ejemplares)
 EJEMPLARES = {
     0: [0, 0, 1, 2], 1: [0, 2, 3], 2: [0, 1, 3], 3: [1, 2], 4: [0, 0, 2, 3],
     5: [1, 2, 3], 6: [0, 1, 2, 3], 7: [0, 4], 8: [2, 0], 9: [3, 1],
-    10: [0, 1], 11: [1, 3],
+    10: [0, 1], 11: [1, 3], 12: [0, 2], 13: [1, 3], 14: [0, 2],
+    15: [0, 1, 3], 16: [2, 3], 17: [0, 1], 18: [1, 2], 19: [0, 3],
+    20: [2, 1], 21: [0, 3], 22: [1, 2], 23: [0, 2], 24: [3, 0],
+    25: [0, 1, 2],
 }
 
 SOCIOS = [
@@ -87,6 +146,11 @@ SOCIOS = [
     ("Julieta", "Romero", "37666333"), ("Nicolás", "Torres", "34888222"),
     ("Agustina", "Álvarez", "43111777"), ("Facundo", "Ruiz", "32999555"),
     ("Florencia", "Herrera", "40777444"), ("Bruno", "Castro", "38222111"),
+    ("Paula", "Medina", "36444555"), ("Ignacio", "Aguirre", "35666777"),
+    ("Milagros", "Benítez", "44111333"), ("Santiago", "Quiroga", "37222444"),
+    ("Rocío", "Molina", "41888555"), ("Lautaro", "Giménez", "39333666"),
+    ("Antonella", "Ríos", "42555888"), ("Franco", "Acosta", "33444999"),
+    ("Micaela", "Sosa", "40999111"), ("Emiliano", "Ortiz", "38777222"),
 ]
 
 RESPONSABLES = ["M. Ibáñez", "C. Ortega", "P. Molina", "R. Vega"]
@@ -130,6 +194,10 @@ class Simulacion:
         self.sede_baja = sedes[4].id
         self.socios_ids = [s.id for s in self.socios.listar()]
         self.morosos = set(self.socios_ids[:3])
+        self.generos = {l[0]: l[5] for l in LIBROS}
+        generos = sorted(set(self.generos.values()))
+        self.preferencia = {s: self.rnd.choice(generos)
+                            for s in self.socios_ids}
 
     # --- una jornada ----------------------------------------------------
     def jornada(self, dia):
@@ -156,13 +224,18 @@ class Simulacion:
         disponibles = [e for e in disponibles if e.esta_en_su_sede]
         if not disponibles:
             return
+        socio_id = self.rnd.choice(self.socios_ids)
+        # Cada socio prefiere un género: 70 % de sus pedidos van por ahí.
+        preferidos = [e for e in disponibles
+                      if self.generos[e.isbn] == self.preferencia[socio_id]]
+        if preferidos and self.rnd.random() < 0.7:
+            disponibles = preferidos
         ejemplar = self.rnd.choice(disponibles)
         destino = ejemplar.sede_id
         if interbibliotecario:
             destino = self.rnd.choice(
                 [s for s in self.sedes_activas if s != ejemplar.sede_id])
-        self.intentar(self.prestamos.solicitar,
-                      self.rnd.choice(self.socios_ids), ejemplar.id,
+        self.intentar(self.prestamos.solicitar, socio_id, ejemplar.id,
                       ejemplar.sede_id, destino)
 
     def nueva_reserva(self):

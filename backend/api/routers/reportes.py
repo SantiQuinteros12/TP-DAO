@@ -44,3 +44,9 @@ def disponibilidad_por_sede(svc: ReporteService = Reportes):
 def logistica(desde: Optional[date] = None, hasta: Optional[date] = None,
               svc: ReporteService = Reportes):
     return svc.logistica(desde, hasta)
+
+
+@router.get("/tendencias")
+def tendencias(desde: Optional[date] = None, hasta: Optional[date] = None,
+               svc: ReporteService = Reportes):
+    return svc.tendencias(desde, hasta)

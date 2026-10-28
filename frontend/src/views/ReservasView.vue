@@ -3,10 +3,12 @@
  * Gestión de reservas: cola FIFO por libro y sede. Cuando un ejemplar se
  * libera, el backend lo asigna automáticamente a la reserva más antigua.
  */
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import CampoForm from '../components/CampoForm.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import { catalogoApi, reservasApi, sedesApi, sociosApi } from '../services/api'
+import TypeAhead from '../components/TypeAhead.vue'
+import { buscar, catalogoApi, reservasApi, sedesApi } from '../services/api'
 import { ejecutar, useToast } from '../composables/useToast'
 import { etiqueta, fecha } from '../composables/formato'
 
@@ -17,25 +19,41 @@ const filtros = reactive({ estado: '', sede_id: '' })
 const ESTADOS = ['PENDIENTE', 'DISPONIBLE', 'CUMPLIDA', 'CANCELADA', 'VENCIDA']
 
 const nueva = ref(null)
-const socios = ref([])
-const libros = ref([])
+const socioElegido = ref(null)
+const sedesDelLibro = ref([])
 
 async function cargar() {
   reservas.value = (await ejecutar(() => reservasApi.listar(filtros))) ?? []
 }
 watch(filtros, cargar)
 
-async function abrirNueva() {
-  nueva.value = { socio_id: '', isbn: '', sede_id: '' }
-  const [s, l] = await Promise.all([
-    ejecutar(() => sociosApi.listar({ habilitado: true })),
-    ejecutar(() => catalogoApi.listarLibros())
-  ])
-  socios.value = s ?? []
-  libros.value = l ?? []
+function abrirNueva() {
+  nueva.value = { socio_id: null, isbn: null, sede_id: '' }
+  socioElegido.value = null
+  sedesDelLibro.value = []
 }
 
+/** Sólo se puede reservar en sedes que poseen ejemplares del libro. */
+async function elegirLibro(libro) {
+  nueva.value.sede_id = ''
+  sedesDelLibro.value = libro
+    ? ((await ejecutar(() => catalogoApi.disponibilidad({ isbn: libro.isbn }))) ?? []).filter((d) => d.sede_activa)
+    : []
+}
+
+const faltante = computed(() => {
+  const n = nueva.value
+  if (!n) return ''
+  if (!n.socio_id) return 'Elegí el socio'
+  if (socioElegido.value && !socioElegido.value.habilitado) return 'El socio está inhabilitado'
+  if (!n.isbn) return 'Elegí el libro'
+  if (!sedesDelLibro.value.length) return 'Ninguna sede activa tiene este libro'
+  if (!n.sede_id) return 'Elegí la sede de retiro'
+  return ''
+})
+
 async function crear() {
+  if (faltante.value) return
   const r = await ejecutar(() => reservasApi.crear(nueva.value))
   if (r) {
     toast.exito(
@@ -69,10 +87,7 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
-        <h1>Reservas</h1>
-        <p>Se atienden por orden de llegada. Una reserva disponible debe retirarse dentro de los 3 días.</p>
-      </div>
+      <h1>Reservas</h1>
       <div class="btn-group">
         <button class="btn" @click="procesarVencimientos">Procesar vencimientos</button>
         <button class="btn btn-primary" @click="abrirNueva">+ Nueva reserva</button>
@@ -120,33 +135,45 @@ onMounted(async () => {
       </div>
     </div>
 
-    <ModalDialog v-if="nueva" titulo="Nueva reserva" @cerrar="nueva = null">
-      <form class="form" @submit.prevent="crear">
-        <label class="field">
-          <span>Socio *</span>
-          <select v-model="nueva.socio_id" required>
-            <option value="" disabled>Elegí un socio habilitado…</option>
-            <option v-for="s in socios" :key="s.id" :value="s.id">{{ s.nombre_completo }} — DNI {{ s.documento }}</option>
+    <ModalDialog v-if="nueva" titulo="Nueva reserva" ancho="560px" @cerrar="nueva = null">
+      <form class="form" novalidate @submit.prevent="crear">
+        <CampoForm etiqueta="Socio" requerido>
+          <TypeAhead
+            v-model="nueva.socio_id"
+            :buscar="buscar.socios"
+            :texto-de="(s) => s.nombre_completo"
+            :detalle-de="(s) => `DNI ${s.documento}${s.habilitado ? '' : ' · inhabilitado'}`"
+            placeholder="Buscá por apellido, nombre o DNI…"
+            @elegir="(s) => (socioElegido = s)"
+          />
+        </CampoForm>
+        <div v-if="socioElegido && !socioElegido.habilitado" class="alert error" role="alert">
+          <strong>{{ socioElegido.nombre_completo }} está inhabilitado</strong> y no puede reservar
+          ({{ socioElegido.motivo_inhabilitacion }}).
+        </div>
+        <CampoForm etiqueta="Libro" requerido>
+          <TypeAhead
+            v-model="nueva.isbn"
+            :buscar="buscar.libros"
+            :texto-de="(l) => l.titulo"
+            :detalle-de="(l) => `${l.autor} · ISBN ${l.isbn}`"
+            :clave-de="(l) => l.isbn"
+            placeholder="Buscá por título, autor o ISBN…"
+            @elegir="elegirLibro"
+          />
+        </CampoForm>
+        <CampoForm etiqueta="Sede de retiro" requerido>
+          <select v-model="nueva.sede_id" :disabled="!sedesDelLibro.length">
+            <option value="" disabled>{{ nueva.isbn ? 'Elegí una sede…' : 'Primero elegí el libro' }}</option>
+            <option v-for="d in sedesDelLibro" :key="d.sede_id" :value="d.sede_id">
+              {{ d.sede }} · {{ d.disponibles }} disp.{{ d.reservas_en_espera ? ` · ${d.reservas_en_espera} en espera` : '' }}
+            </option>
           </select>
-        </label>
-        <label class="field">
-          <span>Libro *</span>
-          <select v-model="nueva.isbn" required>
-            <option value="" disabled>Elegí un libro…</option>
-            <option v-for="l in libros" :key="l.isbn" :value="l.isbn">{{ l.titulo }} — {{ l.autor }}</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Sede de retiro *</span>
-          <select v-model="nueva.sede_id" required>
-            <option value="" disabled>Elegí una sede…</option>
-            <option v-for="s in sedes.filter((x) => x.activa)" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-          </select>
-          <small class="hint">La sede debe poseer ejemplares del libro. Si no, solicitá un préstamo interbibliotecario.</small>
-        </label>
+        </CampoForm>
         <div class="form-actions">
+          <span v-if="faltante" class="small muted" style="margin-right: auto; align-self: center">{{ faltante }}</span>
           <button type="button" class="btn" @click="nueva = null">Cancelar</button>
-          <button class="btn btn-primary">Reservar</button>
+          <button class="btn btn-primary" :disabled="!!faltante">Reservar</button>
         </div>
       </form>
     </ModalDialog>

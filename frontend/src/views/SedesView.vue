@@ -3,15 +3,40 @@
  * ABMC de Sedes: alta, modificación, baja/reactivación y listado.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
+import CampoForm from '../components/CampoForm.vue'
+import DireccionEditor from '../components/DireccionEditor.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
+import HorarioEditor from '../components/HorarioEditor.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import { sedesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
+import { r, useValidacion } from '../composables/validacion'
+import { copiarFranjas, errorHorario } from '../composables/horario'
 
 const sedes = ref([])
+const provincias = ref([])
 const mostrarBajas = ref(true)
 const editando = ref(null) // null = cerrado, {} = nueva, {id..} = edición
-const form = reactive({ nombre: '', direccion: '', telefono: '', email: '', horario: '' })
+
+const DIRECCION_VACIA = { calle: '', numero: '', piso_depto: '', barrio: '', ciudad: 'Córdoba', provincia: 'Córdoba', codigo_postal: '' }
+const form = reactive({ nombre: '', telefono: '', email: '', horario: [] })
+const direccion = reactive({ ...DIRECCION_VACIA })
+
+const vSede = useValidacion(form, {
+  nombre: [r.requerido('El nombre'), r.minimo(3), r.maximo(80)],
+  telefono: [r.telefono()],
+  email: [r.email()],
+  horario: [(h) => errorHorario(h)]
+})
+const vDireccion = useValidacion(direccion, {
+  calle: [r.requerido('La calle'), r.conLetras(), r.maximo(80)],
+  numero: [r.requerido('La altura'), r.altura()],
+  piso_depto: [r.maximo(20)],
+  barrio: [r.maximo(60)],
+  ciudad: [r.requerido('La ciudad'), r.nombre()],
+  provincia: [r.requerido('La provincia')],
+  codigo_postal: [r.codigoPostal()]
+})
 
 const visibles = computed(() => sedes.value.filter((s) => mostrarBajas.value || s.activa))
 
@@ -20,14 +45,22 @@ async function cargar() {
 }
 
 function abrir(sede = {}) {
-  Object.assign(form, { nombre: '', direccion: '', telefono: '', email: '', horario: '' }, sede)
+  Object.assign(form, {
+    nombre: sede.nombre ?? '',
+    telefono: sede.telefono ?? '',
+    email: sede.email ?? '',
+    horario: copiarFranjas(sede.horario ?? [{ dias: [0, 1, 2, 3, 4], desde: '08:00', hasta: '20:00' }])
+  })
+  Object.assign(direccion, DIRECCION_VACIA, sede.direccion ?? {})
+  vSede.reiniciar()
+  vDireccion.reiniciar()
   editando.value = sede
 }
 
 async function guardar() {
-  const datos = { ...form }
-  delete datos.id
-  delete datos.activa
+  const okSede = vSede.validar()
+  if (!vDireccion.validar() || !okSede) return
+  const datos = { ...form, direccion: { ...direccion } }
   const ok = editando.value.id
     ? await ejecutar(() => sedesApi.actualizar(editando.value.id, datos), 'Sede actualizada')
     : await ejecutar(() => sedesApi.crear(datos), 'Sede creada')
@@ -44,16 +77,16 @@ async function cambiarEstado(sede) {
   if (ok) cargar()
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  provincias.value = (await ejecutar(() => sedesApi.provincias())) ?? []
+  cargar()
+})
 </script>
 
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
-        <h1>Sedes de la red</h1>
-        <p>Una sede dada de baja no puede originar ni recibir préstamos, reservas ni envíos.</p>
-      </div>
+      <h1>Sedes de la red</h1>
       <button class="btn btn-primary" @click="abrir()">+ Nueva sede</button>
     </header>
 
@@ -72,9 +105,9 @@ onMounted(cargar)
           <tbody>
             <tr v-for="s in visibles" :key="s.id">
               <td><strong>{{ s.nombre }}</strong></td>
-              <td>{{ s.direccion }}</td>
+              <td class="small">{{ s.direccion_texto }}</td>
               <td class="small">{{ s.telefono }}<br /><span class="muted">{{ s.email }}</span></td>
-              <td class="small">{{ s.horario }}</td>
+              <td class="small horario-celda">{{ s.horario_texto }}</td>
               <td><EstadoBadge :estado="s.activa ? 'ACTIVA' : 'BAJA'" /></td>
               <td class="actions">
                 <div class="btn-group" style="justify-content: flex-end">
@@ -91,15 +124,28 @@ onMounted(cargar)
       </div>
     </div>
 
-    <ModalDialog v-if="editando" :titulo="editando.id ? 'Editar sede' : 'Nueva sede'" @cerrar="editando = null">
-      <form class="form" @submit.prevent="guardar">
-        <label class="field"><span>Nombre *</span><input v-model="form.nombre" required /></label>
-        <label class="field"><span>Dirección *</span><input v-model="form.direccion" required /></label>
+    <ModalDialog v-if="editando" :titulo="editando.id ? 'Editar sede' : 'Nueva sede'" ancho="640px" @cerrar="editando = null">
+      <form class="form" novalidate @submit.prevent="guardar">
+        <CampoForm etiqueta="Nombre" requerido :error="vSede.error('nombre')" @tocar="vSede.tocar('nombre')">
+          <input v-model="form.nombre" maxlength="80" placeholder="Sede Centro" />
+        </CampoForm>
+
+        <DireccionEditor v-model="direccion" :provincias="provincias" :validacion="vDireccion" />
+
         <div class="form-row">
-          <label class="field"><span>Teléfono</span><input v-model="form.telefono" /></label>
-          <label class="field"><span>Email</span><input v-model="form.email" type="email" /></label>
+          <CampoForm etiqueta="Teléfono" :error="vSede.error('telefono')" @tocar="vSede.tocar('telefono')">
+            <input v-model="form.telefono" v-filtro="'telefono'" type="tel" inputmode="tel" maxlength="20" placeholder="0351-4331100" />
+          </CampoForm>
+          <CampoForm etiqueta="Email" :error="vSede.error('email')" @tocar="vSede.tocar('email')">
+            <input v-model="form.email" type="email" maxlength="120" placeholder="sede@bibliored.org" />
+          </CampoForm>
         </div>
-        <label class="field"><span>Horario de atención</span><input v-model="form.horario" placeholder="Lun a Vie 8 a 20" /></label>
+
+        <div class="field">
+          <span>Horario de atención</span>
+          <HorarioEditor v-model="form.horario" />
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn" @click="editando = null">Cancelar</button>
           <button class="btn btn-primary">Guardar</button>
@@ -108,3 +154,7 @@ onMounted(cargar)
     </ModalDialog>
   </section>
 </template>
+
+<style scoped>
+.horario-celda { max-width: 240px; }
+</style>

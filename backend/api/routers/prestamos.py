@@ -24,6 +24,12 @@ def listar(estado: Optional[EstadoPrestamo] = None,
         tipo.value if tipo else None, vencidos)
 
 
+@router.get("/elegibilidad/{socio_id}")
+def elegibilidad(socio_id: int, svc: PrestamoService = Servicio):
+    """Chequeo anticipado: ¿el socio puede pedir un préstamo ahora?"""
+    return svc.evaluar_elegibilidad(socio_id)
+
+
 @router.get("/{prestamo_id}")
 def obtener(prestamo_id: int, svc: PrestamoService = Servicio):
     prestamo = svc.obtener(prestamo_id)

@@ -318,3 +318,114 @@ class ConsultasSQLite:
                      WHERE estado IN ('PENDIENTE', 'DISPONIBLE'))
                        AS reservas_activas""").fetchone()
         return dict(fila)
+
+    # ===================================================================
+    # Tendencias (reportes gráficos)
+    # ===================================================================
+    def prestamos_por_mes(self, desde, hasta):
+        return _dicts(self._cx.execute("""
+            SELECT substr(fecha_solicitud, 1, 7) AS mes,
+                   SUM(tipo = 'LOCAL') AS locales,
+                   SUM(tipo = 'INTERBIBLIOTECARIO') AS interbibliotecarios
+              FROM prestamos
+             WHERE fecha_solicitud BETWEEN ? AND ?
+             GROUP BY mes ORDER BY mes""",
+            (desde.isoformat(), hasta.isoformat())))
+
+    def prestamos_por_genero(self, desde, hasta):
+        return _dicts(self._cx.execute("""
+            SELECT COALESCE(NULLIF(l.genero, ''), 'Sin género') AS genero,
+                   COUNT(*) AS prestamos
+              FROM prestamos p
+              JOIN ejemplares e ON e.id = p.ejemplar_id
+              JOIN libros l ON l.isbn = e.isbn
+             WHERE p.fecha_solicitud BETWEEN ? AND ?
+             GROUP BY genero ORDER BY prestamos DESC""",
+            (desde.isoformat(), hasta.isoformat())))
+
+    def conteo_por(self, tabla, columna, campo_fecha, desde, hasta):
+        """Distribución de ``columna`` en ``tabla`` dentro del período."""
+        return _dicts(self._cx.execute(f"""
+            SELECT {columna} AS clave, COUNT(*) AS cantidad
+              FROM {tabla}
+             WHERE {columna} IS NOT NULL
+               AND substr({campo_fecha}, 1, 10) BETWEEN ? AND ?
+             GROUP BY {columna} ORDER BY cantidad DESC""",
+            (desde.isoformat(), hasta.isoformat())))
+
+    def actividad_por_sede(self, desde, hasta):
+        return _dicts(self._cx.execute("""
+            SELECT s.nombre AS sede,
+                   (SELECT COUNT(*) FROM prestamos p
+                     WHERE p.sede_destino_id = s.id
+                       AND p.fecha_solicitud BETWEEN ? AND ?) AS solicitados,
+                   (SELECT COUNT(*) FROM prestamos p
+                     WHERE p.sede_origen_id = s.id
+                       AND p.tipo = 'INTERBIBLIOTECARIO'
+                       AND p.fecha_solicitud BETWEEN ? AND ?) AS provistos
+              FROM sedes s ORDER BY s.nombre""",
+            (desde.isoformat(), hasta.isoformat()) * 2))
+
+    def socios_mas_activos(self, desde, hasta, limite=8):
+        return _dicts(self._cx.execute("""
+            SELECT so.apellido || ', ' || so.nombre AS socio,
+                   COUNT(*) AS prestamos
+              FROM prestamos p JOIN socios so ON so.id = p.socio_id
+             WHERE p.estado <> 'CANCELADO'
+               AND p.fecha_solicitud BETWEEN ? AND ?
+             GROUP BY so.id ORDER BY prestamos DESC, socio LIMIT ?""",
+            (desde.isoformat(), hasta.isoformat(), limite)))
+
+    def metricas_periodo(self, desde, hasta):
+        """Indicadores agregados de un período (para comparar períodos)."""
+        rango = (desde.isoformat(), hasta.isoformat())
+        fila = self._cx.execute("""
+            SELECT (SELECT COUNT(*) FROM prestamos
+                     WHERE substr(fecha_solicitud, 1, 10) BETWEEN ? AND ?) AS prestamos,
+                   (SELECT COUNT(*) FROM prestamos
+                     WHERE tipo = 'INTERBIBLIOTECARIO'
+                       AND substr(fecha_solicitud, 1, 10) BETWEEN ? AND ?)
+                       AS interbibliotecarios,
+                   (SELECT COUNT(*) FROM prestamos
+                     WHERE substr(fecha_devolucion, 1, 10) BETWEEN ? AND ?) AS devoluciones,
+                   (SELECT COALESCE(SUM(multa), 0) FROM prestamos
+                     WHERE substr(fecha_devolucion, 1, 10) BETWEEN ? AND ?) AS multas,
+                   (SELECT COUNT(*) FROM reservas
+                     WHERE substr(fecha_reserva, 1, 10) BETWEEN ? AND ?) AS reservas,
+                   (SELECT COUNT(*) FROM remitos
+                     WHERE substr(fecha_creacion, 1, 10) BETWEEN ? AND ?)
+                       AS remitos""", rango * 6).fetchone()
+        return dict(fila)
+
+    # ===================================================================
+    # Recomendaciones
+    # ===================================================================
+    def libros_para_recomendar(self, desde_recientes):
+        """Catálogo con popularidad reciente y disponibilidad actual."""
+        return _dicts(self._cx.execute("""
+            SELECT l.isbn, l.titulo, l.autor, l.genero, l.editorial,
+                   l.anio_publicacion,
+                   (SELECT COUNT(*) FROM prestamos p
+                      JOIN ejemplares e ON e.id = p.ejemplar_id
+                     WHERE e.isbn = l.isbn AND p.estado <> 'CANCELADO')
+                       AS prestamos_total,
+                   (SELECT COUNT(*) FROM prestamos p
+                      JOIN ejemplares e ON e.id = p.ejemplar_id
+                     WHERE e.isbn = l.isbn AND p.estado <> 'CANCELADO'
+                       AND p.fecha_solicitud >= ?) AS prestamos_recientes,
+                   (SELECT COUNT(*) FROM ejemplares e
+                     WHERE e.isbn = l.isbn AND e.estado = 'DISPONIBLE'
+                       AND e.sede_actual_id = e.sede_id) AS disponibles,
+                   (SELECT GROUP_CONCAT(DISTINCT s.nombre)
+                      FROM ejemplares e JOIN sedes s ON s.id = e.sede_id
+                     WHERE e.isbn = l.isbn AND e.estado = 'DISPONIBLE'
+                       AND e.sede_actual_id = e.sede_id AND s.activa = 1)
+                       AS sedes_disponibles
+              FROM libros l""", (desde_recientes.isoformat(),)))
+
+    def historial_lectura(self):
+        """Pares (socio, isbn) de todos los préstamos no cancelados."""
+        return _dicts(self._cx.execute("""
+            SELECT DISTINCT p.socio_id, e.isbn
+              FROM prestamos p JOIN ejemplares e ON e.id = p.ejemplar_id
+             WHERE p.estado <> 'CANCELADO'"""))

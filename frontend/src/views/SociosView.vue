@@ -4,18 +4,30 @@
  * y consulta de notificaciones y préstamos de cada socio.
  */
 import { onMounted, reactive, ref, watch } from 'vue'
+import CampoForm from '../components/CampoForm.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
 import ModalDialog from '../components/ModalDialog.vue'
 import { prestamosApi, sociosApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { fecha, fechaHora, moneda } from '../composables/formato'
+import { r, useValidacion } from '../composables/validacion'
 
 const socios = ref([])
 const filtros = reactive({ q: '', habilitado: '' })
 const editando = ref(null)
-const form = reactive({})
+const form = reactive({ nombre: '', apellido: '', documento: '', email: '', telefono: '' })
 const inhabilitando = ref(null)
-const motivo = ref('')
+const motivo = reactive({ texto: '' })
+const viendoMotivo = ref(null)
+
+const v = useValidacion(form, {
+  nombre: [r.requerido('El nombre'), r.nombre(), r.maximo(60)],
+  apellido: [r.requerido('El apellido'), r.nombre(), r.maximo(60)],
+  documento: [r.requerido('El documento'), r.dni()],
+  email: [r.email()],
+  telefono: [r.telefono()]
+})
+const vMotivo = useValidacion(motivo, { texto: [r.requerido('El motivo'), r.minimo(3), r.maximo(200)] })
 const seleccionado = ref(null)
 const detalle = reactive({ notificaciones: [], prestamos: [] })
 
@@ -30,11 +42,14 @@ watch(filtros, () => {
 })
 
 function abrir(socio = {}) {
-  Object.assign(form, { nombre: '', apellido: '', documento: '', email: '', telefono: '' }, socio)
+  const { nombre = '', apellido = '', documento = '', email = '', telefono = '' } = socio
+  Object.assign(form, { nombre, apellido, documento, email, telefono })
+  v.reiniciar()
   editando.value = socio
 }
 
 async function guardar() {
+  if (!v.validar()) return
   const { nombre, apellido, documento, email, telefono } = form
   const datos = { nombre, apellido, documento, email, telefono }
   const ok = editando.value.id
@@ -46,11 +61,17 @@ async function guardar() {
   }
 }
 
+function abrirInhabilitacion(socio) {
+  motivo.texto = ''
+  vMotivo.reiniciar()
+  inhabilitando.value = socio
+}
+
 async function confirmarInhabilitacion() {
-  const ok = await ejecutar(() => sociosApi.inhabilitar(inhabilitando.value.id, motivo.value), 'Socio inhabilitado')
+  if (!vMotivo.validar()) return
+  const ok = await ejecutar(() => sociosApi.inhabilitar(inhabilitando.value.id, motivo.texto.trim()), 'Socio inhabilitado')
   if (ok) {
     inhabilitando.value = null
-    motivo.value = ''
     cargar()
   }
 }
@@ -75,10 +96,7 @@ onMounted(cargar)
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
-        <h1>Socios</h1>
-        <p>Los socios inhabilitados no pueden solicitar préstamos ni reservas.</p>
-      </div>
+      <h1>Socios</h1>
       <button class="btn btn-primary" @click="abrir()">+ Nuevo socio</button>
     </header>
 
@@ -107,13 +125,15 @@ onMounted(cargar)
                 <td class="mono">{{ s.documento }}</td>
                 <td class="small">{{ fecha(s.fecha_alta) }}</td>
                 <td>
-                  <EstadoBadge :estado="s.habilitado ? 'HABILITADO' : 'INHABILITADO'" />
-                  <div v-if="!s.habilitado" class="small muted">{{ s.motivo_inhabilitacion }}</div>
+                  <div class="estado-socio">
+                    <EstadoBadge :estado="s.habilitado ? 'HABILITADO' : 'INHABILITADO'" />
+                    <button v-if="!s.habilitado" class="link" type="button" @click.stop="viendoMotivo = s">Ver motivo</button>
+                  </div>
                 </td>
                 <td class="actions" @click.stop>
                   <div class="btn-group" style="justify-content: flex-end">
                     <button class="btn btn-sm" @click="abrir(s)">Editar</button>
-                    <button v-if="s.habilitado" class="btn btn-sm btn-danger" @click="inhabilitando = s">Inhabilitar</button>
+                    <button v-if="s.habilitado" class="btn btn-sm btn-danger" @click="abrirInhabilitacion(s)">Inhabilitar</button>
                     <button v-else class="btn btn-sm" @click="habilitar(s)">Habilitar</button>
                   </div>
                 </td>
@@ -159,15 +179,25 @@ onMounted(cargar)
     </div>
 
     <ModalDialog v-if="editando" :titulo="editando.id ? 'Editar socio' : 'Nuevo socio'" @cerrar="editando = null">
-      <form class="form" @submit.prevent="guardar">
+      <form class="form" novalidate @submit.prevent="guardar">
         <div class="form-row">
-          <label class="field"><span>Nombre *</span><input v-model="form.nombre" required /></label>
-          <label class="field"><span>Apellido *</span><input v-model="form.apellido" required /></label>
+          <CampoForm etiqueta="Nombre" requerido :error="v.error('nombre')" @tocar="v.tocar('nombre')">
+            <input v-model="form.nombre" v-filtro="'nombre'" maxlength="60" autocomplete="given-name" />
+          </CampoForm>
+          <CampoForm etiqueta="Apellido" requerido :error="v.error('apellido')" @tocar="v.tocar('apellido')">
+            <input v-model="form.apellido" v-filtro="'nombre'" maxlength="60" autocomplete="family-name" />
+          </CampoForm>
         </div>
-        <label class="field"><span>Documento *</span><input v-model="form.documento" required placeholder="30111222" /><small class="hint">7 u 8 dígitos. No puede repetirse.</small></label>
+        <CampoForm etiqueta="Documento (DNI)" requerido :error="v.error('documento')" @tocar="v.tocar('documento')">
+          <input v-model="form.documento" v-filtro="'dni'" inputmode="numeric" maxlength="10" placeholder="30111222" />
+        </CampoForm>
         <div class="form-row">
-          <label class="field"><span>Email</span><input v-model="form.email" type="email" /></label>
-          <label class="field"><span>Teléfono</span><input v-model="form.telefono" /></label>
+          <CampoForm etiqueta="Email" :error="v.error('email')" @tocar="v.tocar('email')">
+            <input v-model="form.email" type="email" maxlength="120" placeholder="nombre@mail.com" autocomplete="email" />
+          </CampoForm>
+          <CampoForm etiqueta="Teléfono" :error="v.error('telefono')" @tocar="v.tocar('telefono')">
+            <input v-model="form.telefono" v-filtro="'telefono'" type="tel" inputmode="tel" maxlength="20" placeholder="351-5123456" autocomplete="tel" />
+          </CampoForm>
         </div>
         <div class="form-actions">
           <button type="button" class="btn" @click="editando = null">Cancelar</button>
@@ -177,19 +207,37 @@ onMounted(cargar)
     </ModalDialog>
 
     <ModalDialog v-if="inhabilitando" titulo="Inhabilitar socio" @cerrar="inhabilitando = null">
-      <form class="form" @submit.prevent="confirmarInhabilitacion">
+      <form class="form" novalidate @submit.prevent="confirmarInhabilitacion">
         <p>¿Inhabilitar a <strong>{{ inhabilitando.nombre_completo }}</strong>? No podrá iniciar nuevos préstamos ni reservas.</p>
-        <label class="field"><span>Motivo *</span><input v-model="motivo" required minlength="3" /></label>
+        <CampoForm etiqueta="Motivo" requerido :error="vMotivo.error('texto')" @tocar="vMotivo.tocar('texto')">
+          <textarea v-model="motivo.texto" rows="3" maxlength="200" placeholder="Ej.: multas impagas" />
+        </CampoForm>
         <div class="form-actions">
           <button type="button" class="btn" @click="inhabilitando = null">Cancelar</button>
           <button class="btn btn-primary">Inhabilitar</button>
         </div>
       </form>
     </ModalDialog>
+    <ModalDialog v-if="viendoMotivo" titulo="Motivo de la inhabilitación" ancho="440px" @cerrar="viendoMotivo = null">
+      <div class="motivo">
+        <p><strong>{{ viendoMotivo.nombre_completo }}</strong> · DNI {{ viendoMotivo.documento }}</p>
+        <blockquote>{{ viendoMotivo.motivo_inhabilitacion || 'Sin motivo registrado.' }}</blockquote>
+        <div class="form-actions">
+          <button type="button" class="btn" @click="viendoMotivo = null">Cerrar</button>
+          <button type="button" class="btn btn-primary" @click="habilitar(viendoMotivo); viendoMotivo = null">Habilitar socio</button>
+        </div>
+      </div>
+    </ModalDialog>
   </section>
 </template>
 
 <style scoped>
 .notificaciones { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.estado-socio { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.motivo p { margin: 0 0 10px; }
+.motivo blockquote {
+  margin: 0 0 14px; padding: 10px 14px; border-left: 3px solid var(--critical);
+  background: var(--critical-bg); color: var(--critical-ink); border-radius: 0 8px 8px 0;
+}
 .notificaciones li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
 </style>

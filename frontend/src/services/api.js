@@ -41,6 +41,7 @@ const get = (url, params) => http.get(url, { params: limpiar(params) })
 
 export const sedesApi = {
   listar: (params) => get('/sedes', params),
+  provincias: () => http.get('/sedes/provincias'),
   crear: (datos) => http.post('/sedes', datos),
   actualizar: (id, datos) => http.put(`/sedes/${id}`, datos),
   darDeBaja: (id) => http.post(`/sedes/${id}/baja`),
@@ -49,6 +50,7 @@ export const sedesApi = {
 
 export const sociosApi = {
   listar: (params) => get('/socios', params),
+  obtener: (id) => http.get(`/socios/${id}`),
   crear: (datos) => http.post('/socios', datos),
   actualizar: (id, datos) => http.put(`/socios/${id}`, datos),
   inhabilitar: (id, motivo) => http.post(`/socios/${id}/inhabilitar`, { motivo }),
@@ -73,6 +75,7 @@ export const catalogoApi = {
 export const prestamosApi = {
   listar: (params) => get('/prestamos', params),
   obtener: (id) => http.get(`/prestamos/${id}`),
+  elegibilidad: (socioId) => http.get(`/prestamos/elegibilidad/${socioId}`),
   solicitar: (datos) => http.post('/prestamos', datos),
   entregar: (id) => http.post(`/prestamos/${id}/entregar`),
   devolver: (id, condicion, observaciones) =>
@@ -100,5 +103,17 @@ export const reportesApi = {
   vencidos: () => http.get('/reportes/vencidos'),
   masSolicitados: (params) => get('/reportes/libros-mas-solicitados', params),
   disponibilidadSedes: () => http.get('/reportes/disponibilidad-sedes'),
-  logistica: (params) => get('/reportes/logistica', params)
+  logistica: (params) => get('/reportes/logistica', params),
+  tendencias: (params) => get('/reportes/tendencias', params)
+}
+
+export const recomendacionesApi = {
+  paraSocio: (socioId, limite = 8) => get('/recomendaciones', { socio_id: socioId, limite }),
+  similares: (isbn, limite = 6) => get(`/recomendaciones/similares/${isbn}`, { limite })
+}
+
+/** Buscadores para los componentes type-ahead. */
+export const buscar = {
+  socios: (q, extra = {}) => sociosApi.listar({ q, ...extra }),
+  libros: (q) => catalogoApi.listarLibros(q)
 }

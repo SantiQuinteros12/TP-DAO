@@ -1,8 +1,12 @@
 """Entidad Libro (obra del catálogo) y Value Object ISBN."""
 
 import re
+from datetime import date
 
+from domain import validaciones as v
 from domain.excepciones import DatoInvalidoError
+
+_AUTOR = re.compile(rf"[{v.LETRAS}.,' \-]+")
 
 
 class ISBN:
@@ -68,13 +72,22 @@ class Libro:
         return self._isbn.valor
 
     def _validar(self):
-        if not (self.titulo or "").strip():
-            raise DatoInvalidoError("El título es obligatorio")
-        if not (self.autor or "").strip():
-            raise DatoInvalidoError("El autor es obligatorio")
-        if self.anio_publicacion is not None and not (
-                0 < int(self.anio_publicacion) <= 2100):
-            raise DatoInvalidoError("Año de publicación inválido")
+        self.titulo = v.texto_obligatorio(self.titulo, "El título", 200)
+        self.autor = v.texto_obligatorio(self.autor, "El autor", 120)
+        if not _AUTOR.fullmatch(self.autor):
+            raise DatoInvalidoError(
+                "El autor sólo puede contener letras, espacios, puntos, "
+                "comas, apóstrofos o guiones")
+        self.editorial = v.texto_opcional(self.editorial, "La editorial", 80)
+        self.genero = v.nombre_propio(self.genero, "El género",
+                                      obligatorio=False)
+        if self.anio_publicacion is not None:
+            anio = int(self.anio_publicacion)
+            if not 1000 <= anio <= date.today().year:
+                raise DatoInvalidoError(
+                    f"El año de publicación debe estar entre 1000 y "
+                    f"{date.today().year}")
+            self.anio_publicacion = anio
 
     def actualizar(self, titulo, autor, editorial, anio_publicacion, genero):
         self.titulo = titulo

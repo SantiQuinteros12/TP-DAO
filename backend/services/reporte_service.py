@@ -157,3 +157,41 @@ class ReporteService:
             "por_sede": [{"sede": s, **v}
                          for s, v in sorted(por_sede.items())],
         }
+
+    def tendencias(self, desde=None, hasta=None):
+        """
+        Reporte 6: evolución y composición de la actividad del período
+        (para gráficos) y comparación contra el período anterior de igual
+        duración.
+        """
+        desde, hasta = self._rango(desde, hasta, dias_por_defecto=90)
+        duracion = hasta - desde
+        anterior_hasta = desde - timedelta(days=1)
+        anterior_desde = anterior_hasta - duracion
+        c = self.consultas
+
+        def distribucion(tabla, columna, campo_fecha):
+            return [{"clave": f["clave"], "cantidad": f["cantidad"]}
+                    for f in c.conteo_por(tabla, columna, campo_fecha,
+                                          desde, hasta)]
+
+        return {
+            "desde": desde.isoformat(), "hasta": hasta.isoformat(),
+            "prestamos_por_mes": c.prestamos_por_mes(desde, hasta),
+            "prestamos_por_genero": c.prestamos_por_genero(desde, hasta),
+            "estados_prestamos": distribucion("prestamos", "estado",
+                                              "fecha_solicitud"),
+            "condicion_devoluciones": distribucion(
+                "prestamos", "condicion_devolucion", "fecha_devolucion"),
+            "remitos_por_tipo": distribucion("remitos", "tipo",
+                                             "fecha_creacion"),
+            "actividad_por_sede": c.actividad_por_sede(desde, hasta),
+            "socios_mas_activos": c.socios_mas_activos(desde, hasta),
+            "comparativa": {
+                "actual": c.metricas_periodo(desde, hasta),
+                "anterior": c.metricas_periodo(anterior_desde,
+                                               anterior_hasta),
+                "anterior_desde": anterior_desde.isoformat(),
+                "anterior_hasta": anterior_hasta.isoformat(),
+            },
+        }

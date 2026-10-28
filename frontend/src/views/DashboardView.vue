@@ -6,9 +6,14 @@
  *  3. Libros más solicitados para préstamos inter-sedes
  *  4. Disponibilidad de catálogo por sede
  *  5. Tasa de envíos exitosos e incidencias / tiempo promedio de tránsito
+ *  6. Tendencias del período: evolución mensual, composición (tortas) y
+ *     comparación contra el período anterior
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import BarChart from '../components/BarChart.vue'
+import ColumnChart from '../components/ColumnChart.vue'
+import DeltaTile from '../components/DeltaTile.vue'
+import DonutChart from '../components/DonutChart.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
 import StackedBar from '../components/StackedBar.vue'
 import StatTile from '../components/StatTile.vue'
@@ -32,14 +37,17 @@ const vencidos = ref(null)
 const solicitados = ref(null)
 const disponibilidad = ref([])
 const logistica = ref(null)
+const tendencias = ref(null)
 
 async function cargarPeriodo() {
-  const [s, l] = await Promise.all([
+  const [s, l, t] = await Promise.all([
     ejecutar(() => reportesApi.masSolicitados({ ...periodo, limite: 8 })),
-    ejecutar(() => reportesApi.logistica(periodo))
+    ejecutar(() => reportesApi.logistica(periodo)),
+    ejecutar(() => reportesApi.tendencias(periodo))
   ])
   solicitados.value = s
   logistica.value = l
+  tendencias.value = t
 }
 watch(periodo, cargarPeriodo)
 
@@ -86,6 +94,59 @@ const filasDisp = computed(() =>
   }))
 )
 
+// --- 6. tendencias ---------------------------------------------------------
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+const nombreMes = (m) => `${MESES[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`
+const t = computed(() => tendencias.value ?? {})
+
+const porMes = computed(() =>
+  (t.value.prestamos_por_mes ?? []).map((m) => ({
+    etiqueta: nombreMes(m.mes),
+    valores: { locales: m.locales, interbib: m.interbibliotecarios }
+  }))
+)
+const SERIES_MES = [
+  { clave: 'locales', nombre: 'Locales' },
+  { clave: 'interbib', nombre: 'Interbibliotecarios' }
+]
+const porSede = computed(() =>
+  (t.value.actividad_por_sede ?? []).map((s) => ({
+    etiqueta: s.sede.replace(/^(Sede|Biblioteca) /, ''),
+    valores: { solicitados: s.solicitados, provistos: s.provistos }
+  }))
+)
+const SERIES_SEDE = [
+  { clave: 'solicitados', nombre: 'Préstamos retirados en la sede' },
+  { clave: 'provistos', nombre: 'Ejemplares prestados a otras sedes' }
+]
+const torta = (lista) => (lista ?? []).map((d) => ({ etiqueta: etiqueta(d.clave), valor: d.cantidad }))
+const tortaTipos = computed(() => {
+  const a = t.value.comparativa?.actual
+  return a
+    ? [
+        { etiqueta: 'Locales', valor: a.prestamos - a.interbibliotecarios },
+        { etiqueta: 'Interbibliotecarios', valor: a.interbibliotecarios }
+      ]
+    : []
+})
+const barrasGenero = computed(() =>
+  (t.value.prestamos_por_genero ?? []).map((g) => ({ etiqueta: g.genero, valor: g.prestamos })))
+const barrasSocios = computed(() =>
+  (t.value.socios_mas_activos ?? []).map((s) => ({ etiqueta: s.socio, valor: s.prestamos })))
+const tortaDisponibilidad = computed(() => {
+  const suma = (c) => disponibilidad.value.reduce((s, d) => s + (d[c] ?? 0), 0)
+  return [
+    { etiqueta: 'Disponibles', valor: suma('disponibles') },
+    { etiqueta: 'Prestados', valor: suma('prestados') },
+    { etiqueta: 'Reservados', valor: suma('reservados') },
+    { etiqueta: 'En tránsito', valor: suma('en_transito') },
+    { etiqueta: 'Dañados', valor: suma('danados') }
+  ]
+})
+const tortaIncidencias = computed(() =>
+  (logistica.value?.incidencias_por_tipo ?? []).map((i) => ({ etiqueta: etiqueta(i.tipo), valor: i.cantidad })))
+const cmp = computed(() => t.value.comparativa ?? null)
+
 const ind = computed(() => logistica.value?.indicadores ?? {})
 const pct = (v) => (v === null || v === undefined ? '—' : `${numero(v, 1)}%`)
 const horas = (h) => {
@@ -97,10 +158,8 @@ const horas = (h) => {
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
-        <h1>Reportes de gestión</h1>
-        <p>Estado operativo de la red de bibliotecas al {{ fecha(isoDia(hoy)) }}.</p>
-      </div>
+      <h1>Reportes de gestión</h1>
+      <span class="small muted">Al {{ fecha(isoDia(hoy)) }}</span>
     </header>
 
     <!-- KPIs -->
@@ -111,12 +170,88 @@ const horas = (h) => {
       <StatTile etiqueta="Ejemplares en la red" :valor="numero(resumen.ejemplares)" :detalle="`${resumen.titulos} títulos · ${resumen.sedes_activas} sedes activas`" />
     </div>
 
+    <!-- Filtro de período (aplica a 3, 5 y 6) -->
+    <div class="card periodo">
+      <strong>Período</strong>
+      <div class="btn-group">
+        <button v-for="r in RANGOS" :key="r.dias" class="btn btn-sm" :class="{ 'btn-primary': periodo.desde === hace(r.dias) && periodo.hasta === isoDia(hoy) }" @click="elegirRango(r.dias)">{{ r.texto }}</button>
+      </div>
+      <label class="toolbar small">Desde <input v-model="periodo.desde" type="date" /></label>
+      <label class="toolbar small">Hasta <input v-model="periodo.hasta" type="date" /></label>
+    </div>
+
+    <!-- 6. Tendencias -->
+    <div class="card">
+      <div class="card-header">
+        <h2>6 · Tendencias del período</h2>
+        <span v-if="cmp" class="small muted">vs. {{ fecha(cmp.anterior_desde) }} – {{ fecha(cmp.anterior_hasta) }}</span>
+      </div>
+      <div v-if="cmp" class="kpis">
+        <DeltaTile etiqueta="Préstamos solicitados" :actual="cmp.actual.prestamos" :anterior="cmp.anterior.prestamos" />
+        <DeltaTile etiqueta="Interbibliotecarios" :actual="cmp.actual.interbibliotecarios" :anterior="cmp.anterior.interbibliotecarios" />
+        <DeltaTile etiqueta="Devoluciones" :actual="cmp.actual.devoluciones" :anterior="cmp.anterior.devoluciones" />
+        <DeltaTile etiqueta="Reservas" :actual="cmp.actual.reservas" :anterior="cmp.anterior.reservas" />
+        <DeltaTile etiqueta="Remitos emitidos" :actual="cmp.actual.remitos" :anterior="cmp.anterior.remitos" />
+        <DeltaTile etiqueta="Multas cobradas" :actual="cmp.actual.multas" :anterior="cmp.anterior.multas" :formato="moneda" invertido />
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Préstamos por mes</h2></div>
+        <ColumnChart :categorias="porMes" :series="SERIES_MES" unidad="préstamos" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Actividad por sede</h2></div>
+        <ColumnChart :categorias="porSede" :series="SERIES_SEDE" unidad="préstamos" />
+      </div>
+    </div>
+
+    <div class="tortas">
+      <div class="card">
+        <div class="card-header"><h2>Local vs. interbibliotecario</h2></div>
+        <DonutChart :datos="tortaTipos" unidad="préstamos" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Estado de los préstamos</h2></div>
+        <DonutChart :datos="torta(t.estados_prestamos)" unidad="préstamos" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Estado físico en devoluciones</h2></div>
+        <DonutChart :datos="torta(t.condicion_devoluciones)" unidad="devoluciones" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Remitos por tipo</h2></div>
+        <DonutChart :datos="torta(t.remitos_por_tipo)" unidad="remitos" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Ejemplares de la red por estado</h2></div>
+        <DonutChart :datos="tortaDisponibilidad" unidad="ejemplares" />
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Incidencias logísticas por tipo</h2></div>
+        <DonutChart :datos="tortaIncidencias" unidad="incidencias" />
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Préstamos por género</h2></div>
+        <BarChart v-if="barrasGenero.length" :datos="barrasGenero" unidad="préstamos" />
+        <p v-else class="empty">Sin préstamos en el período.</p>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Socios más activos</h2></div>
+        <BarChart v-if="barrasSocios.length" :datos="barrasSocios" unidad="préstamos" />
+        <p v-else class="empty">Sin préstamos en el período.</p>
+      </div>
+    </div>
+
     <!-- 1. Préstamos activos y tránsito -->
     <div class="card">
       <div class="card-header">
         <div>
           <h2>1 · Préstamos activos y material en tránsito por sede</h2>
-          <p>Activos según sede de retiro; remitos salientes/entrantes despachados y aún no recibidos.</p>
         </div>
       </div>
       <div class="table-wrap">
@@ -165,7 +300,6 @@ const horas = (h) => {
       <div class="card-header">
         <div>
           <h2>2 · Préstamos vencidos y multas acumuladas</h2>
-          <p>Multa estimada al día de hoy según la política de cada tipo (lineal para locales, escalonada para interbibliotecarios).</p>
         </div>
         <strong v-if="vencidos" class="total-multas">{{ moneda(vencidos.total_estimado) }}</strong>
       </div>
@@ -220,24 +354,12 @@ const horas = (h) => {
       </div>
     </div>
 
-    <!-- Filtro de período (aplica a 3 y 5) -->
-    <div class="card periodo">
-      <strong>Período</strong>
-      <div class="btn-group">
-        <button v-for="r in RANGOS" :key="r.dias" class="btn btn-sm" :class="{ 'btn-primary': periodo.desde === hace(r.dias) && periodo.hasta === isoDia(hoy) }" @click="elegirRango(r.dias)">{{ r.texto }}</button>
-      </div>
-      <label class="toolbar small">Desde <input v-model="periodo.desde" type="date" /></label>
-      <label class="toolbar small">Hasta <input v-model="periodo.hasta" type="date" /></label>
-      <span class="small muted">Aplica a los reportes 3 y 5.</span>
-    </div>
-
     <div class="grid-2">
       <!-- 3. Más solicitados -->
       <div class="card">
         <div class="card-header">
           <div>
             <h2>3 · Libros más solicitados entre sedes</h2>
-            <p>Solicitudes de préstamo interbibliotecario por título.</p>
           </div>
         </div>
         <BarChart v-if="barrasSolicitados.length" :datos="barrasSolicitados" unidad="solicitudes" />
@@ -263,7 +385,6 @@ const horas = (h) => {
         <div class="card-header">
           <div>
             <h2>4 · Disponibilidad de catálogo por sede</h2>
-            <p>Ejemplares propios de cada sede según su estado.</p>
           </div>
         </div>
         <StackedBar :filas="filasDisp" :series="SERIES_DISP" />
@@ -290,7 +411,6 @@ const horas = (h) => {
       <div class="card-header">
         <div>
           <h2>5 · Envíos logísticos: éxito, incidencias y tiempos de tránsito</h2>
-          <p>Éxito = recibido sin incidencias sobre remitos finalizados (recibidos + extraviados). Tránsito = despacho → recepción.</p>
         </div>
       </div>
       <div class="kpis">
@@ -352,7 +472,12 @@ const horas = (h) => {
 
 <style scoped>
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.periodo { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 18px; }
+.tortas { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+@media (max-width: 480px) { .tortas { grid-template-columns: 1fr; } }
+.periodo {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 18px;
+  position: sticky; top: 8px; z-index: 4;
+}
 .total-multas { font-size: 22px; font-weight: 600; }
 .tabla-datos { margin-top: 14px; }
 .tabla-datos summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }

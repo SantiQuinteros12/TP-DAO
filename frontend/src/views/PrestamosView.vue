@@ -4,13 +4,16 @@
  * devolución (con evaluación del estado físico) y cancelación.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import CampoForm from '../components/CampoForm.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
 import ModalDialog from '../components/ModalDialog.vue'
-import { catalogoApi, prestamosApi, sedesApi, sociosApi } from '../services/api'
+import TypeAhead from '../components/TypeAhead.vue'
+import { buscar, catalogoApi, prestamosApi, sedesApi, sociosApi } from '../services/api'
 import { ejecutar, useToast } from '../composables/useToast'
 import { etiqueta, fecha, moneda } from '../composables/formato'
 
+const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const prestamos = ref([])
@@ -27,26 +30,42 @@ const sedesActivas = computed(() => sedes.value.filter((s) => s.activa))
 
 // --- nueva solicitud -----------------------------------------------------
 const solicitud = ref(null)
-const socios = ref([])
-const libros = ref([])
+const elegibilidad = ref(null)
+const verificando = ref(false)
 const disponibilidadLibro = ref([])
 const ejemplaresOrigen = ref([])
 
-async function abrirSolicitud() {
-  solicitud.value = { socio_id: '', isbn: '', sede_origen_id: '', ejemplar_id: '', sede_destino_id: '' }
-  const [s, l] = await Promise.all([
-    ejecutar(() => sociosApi.listar({ habilitado: true })),
-    ejecutar(() => catalogoApi.listarLibros())
-  ])
-  socios.value = s ?? []
-  libros.value = l ?? []
+function abrirSolicitud(precarga = {}) {
+  solicitud.value = {
+    socio_id: precarga.socio?.id ?? null,
+    socio: precarga.socio ?? null,
+    isbn: precarga.libro?.isbn ?? null,
+    libro: precarga.libro ?? null,
+    sede_origen_id: '',
+    ejemplar_id: '',
+    sede_destino_id: ''
+  }
+  elegibilidad.value = null
+  disponibilidadLibro.value = []
+  ejemplaresOrigen.value = []
+  if (precarga.socio) verificarSocio(precarga.socio)
+  if (precarga.libro) cargarDisponibilidad(precarga.libro.isbn)
 }
 
-watch(() => solicitud.value?.isbn, async (isbn) => {
-  if (!isbn) return
+/** Validación anticipada: apenas se elige el socio se informa si puede pedir. */
+async function verificarSocio(socio) {
+  elegibilidad.value = null
+  if (!socio) return
+  verificando.value = true
+  elegibilidad.value = (await ejecutar(() => prestamosApi.elegibilidad(socio.id))) ?? null
+  verificando.value = false
+}
+
+async function cargarDisponibilidad(isbn) {
   Object.assign(solicitud.value, { sede_origen_id: '', ejemplar_id: '' })
-  disponibilidadLibro.value = (await ejecutar(() => catalogoApi.disponibilidad({ isbn }))) ?? []
-})
+  ejemplaresOrigen.value = []
+  disponibilidadLibro.value = isbn ? ((await ejecutar(() => catalogoApi.disponibilidad({ isbn }))) ?? []) : []
+}
 
 watch(() => solicitud.value?.sede_origen_id, async (sedeId) => {
   if (!sedeId) return
@@ -64,7 +83,27 @@ const tipoSolicitud = computed(() => {
   return Number(s.sede_origen_id) === Number(s.sede_destino_id) ? 'LOCAL' : 'INTERBIBLIOTECARIO'
 })
 
+const sinStock = computed(() =>
+  !!solicitud.value?.isbn && !disponibilidadLibro.value.some((d) => d.disponibles && d.sede_activa))
+const socioBloqueado = computed(() => !!elegibilidad.value && !elegibilidad.value.puede_solicitar)
+
+/** Primer dato que falta: se muestra junto al botón en lugar de esperar al envío. */
+const faltante = computed(() => {
+  const s = solicitud.value
+  if (!s) return ''
+  if (!s.socio_id) return 'Elegí el socio'
+  if (verificando.value) return 'Verificando al socio…'
+  if (socioBloqueado.value) return 'El socio no puede solicitar préstamos'
+  if (!s.isbn) return 'Elegí el libro'
+  if (sinStock.value) return 'No hay ejemplares disponibles'
+  if (!s.sede_origen_id) return 'Elegí la sede origen'
+  if (!s.sede_destino_id) return 'Elegí la sede de retiro'
+  if (!s.ejemplar_id) return 'No hay ejemplar disponible en esa sede'
+  return ''
+})
+
 async function confirmarSolicitud() {
+  if (faltante.value) return
   const { socio_id, ejemplar_id, sede_origen_id, sede_destino_id } = solicitud.value
   const prestamo = await ejecutar(
     () => prestamosApi.solicitar({ socio_id, ejemplar_id, sede_origen_id, sede_destino_id }),
@@ -83,10 +122,16 @@ const devolviendo = ref(null)
 const devolucion = reactive({ condicion: 'BUENA', observaciones: '' })
 const cancelando = ref(null)
 const motivo = ref('')
+const motivoInvalido = computed(() => motivo.value.trim().length < 3)
 
 function abrirDevolucion(p) {
   Object.assign(devolucion, { condicion: 'BUENA', observaciones: '' })
   devolviendo.value = p
+}
+
+function abrirCancelacion(p) {
+  motivo.value = ''
+  cancelando.value = p
 }
 
 async function entregar(p) {
@@ -106,9 +151,9 @@ async function confirmarDevolucion() {
 }
 
 async function confirmarCancelacion() {
-  if (await ejecutar(() => prestamosApi.cancelar(cancelando.value.id, motivo.value), 'Préstamo cancelado')) {
+  if (motivoInvalido.value) return
+  if (await ejecutar(() => prestamosApi.cancelar(cancelando.value.id, motivo.value.trim()), 'Préstamo cancelado')) {
     cancelando.value = null
-    motivo.value = ''
     cargar()
   }
 }
@@ -116,23 +161,30 @@ async function confirmarCancelacion() {
 async function verRemito(p) {
   const detalle = await ejecutar(() => prestamosApi.obtener(p.id))
   const ultimo = detalle?.remitos?.at(-1)
-  if (ultimo) router.push(`/remitos/${ultimo.id}`)
+  if (ultimo) router.push({ path: `/remitos/${ultimo.id}`, query: { volver: '/prestamos' } })
 }
 
 onMounted(async () => {
   sedes.value = (await ejecutar(() => sedesApi.listar())) ?? []
   cargar()
+  // Precarga desde Recomendaciones: /prestamos?socio_id=..&isbn=..
+  const { socio_id: socioId, isbn } = route.query
+  if (socioId || isbn) {
+    const [socio, libros] = await Promise.all([
+      socioId ? ejecutar(() => sociosApi.obtener(socioId)) : null,
+      isbn ? ejecutar(() => catalogoApi.listarLibros(isbn)) : null
+    ])
+    abrirSolicitud({ socio, libro: libros?.find((l) => l.isbn === isbn) })
+    router.replace({ query: {} })
+  }
 })
 </script>
 
 <template>
   <section class="page">
     <header class="page-header">
-      <div>
-        <h1>Préstamos</h1>
-        <p>Locales (misma sede) o interbibliotecarios (el ejemplar viaja con un remito).</p>
-      </div>
-      <button class="btn btn-primary" @click="abrirSolicitud">+ Nueva solicitud</button>
+      <h1>Préstamos</h1>
+      <button class="btn btn-primary" @click="abrirSolicitud()">+ Nueva solicitud</button>
     </header>
 
     <div class="card">
@@ -183,7 +235,7 @@ onMounted(async () => {
                   <button v-if="p.estado === 'LISTO_PARA_RETIRO'" class="btn btn-sm btn-primary" @click="entregar(p)">Entregar</button>
                   <button v-if="p.estado === 'ACTIVO'" class="btn btn-sm" @click="abrirDevolucion(p)">Devolución</button>
                   <button v-if="p.tipo === 'INTERBIBLIOTECARIO'" class="btn btn-sm" @click="verRemito(p)">Remito</button>
-                  <button v-if="['PENDIENTE_ENVIO', 'LISTO_PARA_RETIRO'].includes(p.estado)" class="btn btn-sm btn-danger" @click="cancelando = p">Cancelar</button>
+                  <button v-if="['PENDIENTE_ENVIO', 'LISTO_PARA_RETIRO'].includes(p.estado)" class="btn btn-sm btn-danger" @click="abrirCancelacion(p)">Cancelar</button>
                 </div>
               </td>
             </tr>
@@ -194,56 +246,81 @@ onMounted(async () => {
     </div>
 
     <!-- Nueva solicitud -->
-    <ModalDialog v-if="solicitud" titulo="Nueva solicitud de préstamo" ancho="600px" @cerrar="solicitud = null">
-      <form class="form" @submit.prevent="confirmarSolicitud">
-        <label class="field">
-          <span>Socio *</span>
-          <select v-model="solicitud.socio_id" required>
-            <option value="" disabled>Elegí un socio habilitado…</option>
-            <option v-for="s in socios" :key="s.id" :value="s.id">{{ s.nombre_completo }} — DNI {{ s.documento }}</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Libro *</span>
-          <select v-model="solicitud.isbn" required>
-            <option value="" disabled>Elegí un libro…</option>
-            <option v-for="l in libros" :key="l.isbn" :value="l.isbn">{{ l.titulo }} — {{ l.autor }}</option>
-          </select>
-        </label>
-        <div class="form-row">
-          <label class="field">
-            <span>Sede origen *</span>
-            <select v-model="solicitud.sede_origen_id" required :disabled="!solicitud.isbn">
-              <option value="" disabled>Sede propietaria…</option>
-              <option v-for="d in disponibilidadLibro" :key="d.sede_id" :value="d.sede_id" :disabled="!d.disponibles || !d.sede_activa">
-                {{ d.sede }} ({{ d.sede_activa ? `${d.disponibles} disp.` : 'baja' }})
-              </option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Sede destino (retiro) *</span>
-            <select v-model="solicitud.sede_destino_id" required>
-              <option value="" disabled>¿Dónde retira el socio?</option>
-              <option v-for="s in sedesActivas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-            </select>
-          </label>
+    <ModalDialog v-if="solicitud" titulo="Nueva solicitud de préstamo" ancho="620px" @cerrar="solicitud = null">
+      <form class="form" novalidate @submit.prevent="confirmarSolicitud">
+        <CampoForm etiqueta="Socio" requerido>
+          <TypeAhead
+            v-model="solicitud.socio_id"
+            :seleccionado="solicitud.socio"
+            :buscar="buscar.socios"
+            :texto-de="(s) => s.nombre_completo"
+            :detalle-de="(s) => `DNI ${s.documento}${s.habilitado ? '' : ' · inhabilitado'}`"
+            placeholder="Buscá por apellido, nombre o DNI…"
+            @elegir="verificarSocio"
+          />
+        </CampoForm>
+
+        <!-- Resultado de la validación anticipada del socio -->
+        <p v-if="verificando" class="alert">Verificando requisitos del socio…</p>
+        <div v-else-if="socioBloqueado" class="alert error" role="alert">
+          <strong>{{ elegibilidad.socio }} no puede solicitar un préstamo:</strong>
+          <ul><li v-for="m in elegibilidad.impedimentos" :key="m">{{ m }}</li></ul>
         </div>
-        <label v-if="ejemplaresOrigen.length" class="field">
-          <span>Ejemplar</span>
-          <select v-model="solicitud.ejemplar_id" required>
-            <option v-for="e in ejemplaresOrigen" :key="e.id" :value="e.id">{{ e.codigo_inventario }} ({{ etiqueta(e.condicion) }})</option>
-          </select>
-        </label>
-        <p v-if="solicitud.isbn && disponibilidadLibro.length && !disponibilidadLibro.some((d) => d.disponibles)" class="alert warning">
-          No hay ejemplares disponibles de este libro en la red. Podés registrar una reserva.
+        <p v-else-if="elegibilidad" class="alert ok">
+          ✓ Habilitado · {{ elegibilidad.prestamos_abiertos }} de {{ elegibilidad.maximo_prestamos }} préstamos abiertos
         </p>
+
+        <fieldset class="resto" :disabled="!elegibilidad || socioBloqueado">
+          <CampoForm etiqueta="Libro" requerido>
+            <TypeAhead
+              v-model="solicitud.isbn"
+              :seleccionado="solicitud.libro"
+              :buscar="buscar.libros"
+              :texto-de="(l) => l.titulo"
+              :detalle-de="(l) => `${l.autor} · ISBN ${l.isbn}`"
+              :clave-de="(l) => l.isbn"
+              :deshabilitado="!elegibilidad || socioBloqueado"
+              placeholder="Buscá por título, autor o ISBN…"
+              @elegir="(l) => cargarDisponibilidad(l?.isbn)"
+            />
+          </CampoForm>
+          <p v-if="sinStock && disponibilidadLibro.length" class="alert warning">
+            No hay ejemplares disponibles de este libro en la red.
+            <RouterLink to="/reservas">Registrar una reserva</RouterLink>
+          </p>
+          <p v-else-if="sinStock" class="alert warning">Este libro no tiene ejemplares cargados.</p>
+          <div class="form-row">
+            <CampoForm etiqueta="Sede origen" requerido>
+              <select v-model="solicitud.sede_origen_id" :disabled="!solicitud.isbn || sinStock">
+                <option value="" disabled>Sede propietaria…</option>
+                <option v-for="d in disponibilidadLibro" :key="d.sede_id" :value="d.sede_id" :disabled="!d.disponibles || !d.sede_activa">
+                  {{ d.sede }} ({{ d.sede_activa ? `${d.disponibles} disp.` : 'baja' }})
+                </option>
+              </select>
+            </CampoForm>
+            <CampoForm etiqueta="Sede de retiro" requerido>
+              <select v-model="solicitud.sede_destino_id">
+                <option value="" disabled>¿Dónde retira el socio?</option>
+                <option v-for="s in sedesActivas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+              </select>
+            </CampoForm>
+          </div>
+          <label v-if="ejemplaresOrigen.length > 1" class="field">
+            <span>Ejemplar</span>
+            <select v-model="solicitud.ejemplar_id">
+              <option v-for="e in ejemplaresOrigen" :key="e.id" :value="e.id">{{ e.codigo_inventario }} ({{ etiqueta(e.condicion) }})</option>
+            </select>
+          </label>
+        </fieldset>
+
         <p v-if="tipoSolicitud === 'LOCAL'" class="alert">Préstamo <strong>local</strong>: se entrega en el momento, con 14 días de plazo.</p>
         <p v-if="tipoSolicitud === 'INTERBIBLIOTECARIO'" class="alert">
           Préstamo <strong>interbibliotecario</strong>: se generará un remito de envío. El plazo de 21 días corre desde que el socio lo retira.
         </p>
         <div class="form-actions">
+          <span v-if="faltante" class="small muted faltante">{{ faltante }}</span>
           <button type="button" class="btn" @click="solicitud = null">Cancelar</button>
-          <button class="btn btn-primary" :disabled="!solicitud.ejemplar_id">Registrar préstamo</button>
+          <button class="btn btn-primary" :disabled="!!faltante">Registrar préstamo</button>
         </div>
       </form>
     </ModalDialog>
@@ -260,14 +337,14 @@ onMounted(async () => {
           (política {{ devolviendo.politica_multa }}).
         </p>
         <fieldset class="field condiciones">
-          <span>Estado físico del material *</span>
+          <span>Estado físico del material <b class="req">*</b></span>
           <label v-for="c in ['BUENA', 'DETERIORADA', 'DANADA']" :key="c" class="opcion">
             <input v-model="devolucion.condicion" type="radio" :value="c" style="width: auto" />
             {{ etiqueta(c) }}
             <small class="muted">{{ { BUENA: 'sin recargo', DETERIORADA: '+ $2.000', DANADA: '+ $15.000, queda fuera de circulación' }[c] }}</small>
           </label>
         </fieldset>
-        <label class="field"><span>Observaciones</span><textarea v-model="devolucion.observaciones" rows="2" /></label>
+        <label class="field"><span>Observaciones</span><textarea v-model="devolucion.observaciones" rows="2" maxlength="300" /></label>
         <p v-if="devolviendo.tipo === 'INTERBIBLIOTECARIO'" class="alert">
           Se generará un remito de retorno hacia {{ devolviendo.sede_origen }}.
         </p>
@@ -280,12 +357,14 @@ onMounted(async () => {
 
     <!-- Cancelación -->
     <ModalDialog v-if="cancelando" titulo="Cancelar préstamo" @cerrar="cancelando = null">
-      <form class="form" @submit.prevent="confirmarCancelacion">
+      <form class="form" novalidate @submit.prevent="confirmarCancelacion">
         <p>Préstamo #{{ cancelando.id }} — {{ cancelando.titulo }} para {{ cancelando.socio }}.</p>
-        <label class="field"><span>Motivo *</span><input v-model="motivo" required minlength="3" /></label>
+        <CampoForm etiqueta="Motivo" requerido :error="motivo && motivoInvalido ? 'Mínimo 3 caracteres' : ''">
+          <input v-model="motivo" maxlength="200" />
+        </CampoForm>
         <div class="form-actions">
           <button type="button" class="btn" @click="cancelando = null">Volver</button>
-          <button class="btn btn-primary">Cancelar préstamo</button>
+          <button class="btn btn-primary" :disabled="motivoInvalido">Cancelar préstamo</button>
         </div>
       </form>
     </ModalDialog>
@@ -299,4 +378,7 @@ onMounted(async () => {
   border: 1px solid var(--grid); border-radius: 8px; cursor: pointer;
 }
 .opcion small { margin-left: auto; }
+.resto { display: grid; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.resto:disabled { opacity: 0.55; }
+.faltante { margin-right: auto; align-self: center; }
 </style>
