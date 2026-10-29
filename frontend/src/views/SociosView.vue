@@ -11,6 +11,10 @@ import { prestamosApi, sociosApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { fecha, fechaHora, moneda } from '../composables/formato'
 import { r, useValidacion } from '../composables/validacion'
+import { Bell, BookOpen, Mail, MousePointerClick, Pencil, Phone, Plus, Search, UserCheck, UserX } from 'lucide-vue-next'
+
+/** Iniciales para el avatar ("Apellido, Nombre" -> "AN"). */
+const iniciales = (nombre = '') => nombre.split(/[\s,]+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join('').toUpperCase()
 
 const socios = ref([])
 const filtros = reactive({ q: '', habilitado: '' })
@@ -96,14 +100,20 @@ onMounted(cargar)
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Socios</h1>
-      <button class="btn btn-primary" @click="abrir()">+ Nuevo socio</button>
+      <div>
+        <h1>Socios</h1>
+        <p>Padrón de lectores, su estado de habilitación, préstamos y avisos recibidos.</p>
+      </div>
+      <button class="btn btn-primary" @click="abrir()"><Plus aria-hidden="true" /> Nuevo socio</button>
     </header>
 
     <div class="split">
       <div class="card">
-        <div class="toolbar" style="margin-bottom: 12px">
-          <div class="grow"><input v-model="filtros.q" placeholder="Buscar por nombre, apellido o DNI…" /></div>
+        <div class="toolbar filtros">
+          <div class="grow buscador">
+            <Search class="lupa" :size="16" aria-hidden="true" />
+            <input v-model="filtros.q" placeholder="Buscar por nombre, apellido o DNI…" />
+          </div>
           <select v-model="filtros.habilitado">
             <option value="">Todos</option>
             <option value="true">Habilitados</option>
@@ -121,9 +131,17 @@ onMounted(cargar)
                 :class="{ selected: seleccionado?.id === s.id }"
                 @click="verDetalle(s)"
               >
-                <td><strong>{{ s.nombre_completo }}</strong><br /><span class="small muted">{{ s.email }}</span></td>
-                <td class="mono">{{ s.documento }}</td>
-                <td class="small">{{ fecha(s.fecha_alta) }}</td>
+                <td>
+                  <div class="persona">
+                    <span class="avatar" :class="{ inhabilitado: !s.habilitado }" aria-hidden="true">{{ iniciales(s.nombre_completo) }}</span>
+                    <span class="datos">
+                      <span class="nombre">{{ s.nombre_completo }}</span>
+                      <span class="email">{{ s.email || 'Sin email' }}</span>
+                    </span>
+                  </div>
+                </td>
+                <td class="mono dni">{{ s.documento }}</td>
+                <td class="fecha-celda">{{ fecha(s.fecha_alta) }}</td>
                 <td>
                   <div class="estado-socio">
                     <EstadoBadge :estado="s.habilitado ? 'HABILITADO' : 'INHABILITADO'" />
@@ -131,50 +149,60 @@ onMounted(cargar)
                   </div>
                 </td>
                 <td class="actions" @click.stop>
-                  <div class="btn-group" style="justify-content: flex-end">
-                    <button class="btn btn-sm" @click="abrir(s)">Editar</button>
-                    <button v-if="s.habilitado" class="btn btn-sm btn-danger" @click="abrirInhabilitacion(s)">Inhabilitar</button>
-                    <button v-else class="btn btn-sm" @click="habilitar(s)">Habilitar</button>
+                  <div class="btn-group derecha">
+                    <button class="btn btn-sm btn-ghost solo-icono" title="Editar socio" aria-label="Editar socio" @click="abrir(s)"><Pencil aria-hidden="true" /></button>
+                    <button v-if="s.habilitado" class="btn btn-sm btn-danger" @click="abrirInhabilitacion(s)"><UserX aria-hidden="true" /> Inhabilitar</button>
+                    <button v-else class="btn btn-sm" @click="habilitar(s)"><UserCheck aria-hidden="true" /> Habilitar</button>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
-          <p v-if="!socios.length" class="empty">Sin resultados.</p>
+          <p v-if="!socios.length" class="empty">No hay socios que coincidan con la búsqueda.</p>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card detalle">
         <template v-if="seleccionado">
-          <div class="card-header">
-            <div>
+          <div class="ficha">
+            <span class="avatar grande" :class="{ inhabilitado: !seleccionado.habilitado }" aria-hidden="true">{{ iniciales(seleccionado.nombre_completo) }}</span>
+            <div class="ficha-datos">
               <h2>{{ seleccionado.nombre_completo }}</h2>
-              <p>DNI {{ seleccionado.documento }} · {{ seleccionado.telefono }}</p>
+              <ul class="contacto">
+                <li><span class="mono">DNI {{ seleccionado.documento }}</span></li>
+                <li v-if="seleccionado.telefono"><Phone :size="14" aria-hidden="true" /> {{ seleccionado.telefono }}</li>
+                <li v-if="seleccionado.email"><Mail :size="14" aria-hidden="true" /> {{ seleccionado.email }}</li>
+              </ul>
             </div>
+            <EstadoBadge :estado="seleccionado.habilitado ? 'HABILITADO' : 'INHABILITADO'" />
           </div>
-          <h3>Préstamos ({{ detalle.prestamos.length }})</h3>
-          <div class="table-wrap" style="margin-bottom: 16px">
+          <h3 class="subtitulo"><BookOpen :size="15" aria-hidden="true" /> Préstamos <span class="cuenta">{{ detalle.prestamos.length }}</span></h3>
+          <div class="table-wrap con-margen">
             <table>
               <tbody>
                 <tr v-for="p in detalle.prestamos.slice(0, 8)" :key="p.id">
-                  <td>{{ p.titulo }}<br /><span class="small muted">{{ p.sede_destino }} · vence {{ fecha(p.fecha_vencimiento) }}</span></td>
+                  <td><span class="titulo-prestamo">{{ p.titulo }}</span><span class="small muted">{{ p.sede_destino }} · vence {{ fecha(p.fecha_vencimiento) }}</span></td>
                   <td><EstadoBadge :estado="p.vencido ? 'VENCIDO' : p.estado" /></td>
                   <td class="num small">{{ p.multa_estimada ? moneda(p.multa_estimada) : '' }}</td>
                 </tr>
               </tbody>
             </table>
-            <p v-if="!detalle.prestamos.length" class="empty">Sin préstamos.</p>
+            <p v-if="!detalle.prestamos.length" class="empty">Todavía no pidió préstamos.</p>
           </div>
-          <h3>Notificaciones</h3>
+          <h3 class="subtitulo"><Bell :size="15" aria-hidden="true" /> Notificaciones <span class="cuenta">{{ detalle.notificaciones.length }}</span></h3>
           <ul class="notificaciones">
             <li v-for="n in detalle.notificaciones.slice(0, 10)" :key="n.id">
+              <Bell class="icono-aviso" :size="15" aria-hidden="true" />
               <span>{{ n.mensaje }}</span>
               <time class="small muted">{{ fechaHora(n.fecha_hora) }}</time>
             </li>
           </ul>
           <p v-if="!detalle.notificaciones.length" class="empty">Sin notificaciones.</p>
         </template>
-        <p v-else class="empty">Seleccioná un socio para ver sus préstamos y notificaciones.</p>
+        <div v-else class="sin-seleccion">
+          <MousePointerClick :size="28" aria-hidden="true" />
+          <p>Seleccioná un socio de la lista para ver sus préstamos y notificaciones.</p>
+        </div>
       </div>
     </div>
 
@@ -214,7 +242,7 @@ onMounted(cargar)
         </CampoForm>
         <div class="form-actions">
           <button type="button" class="btn" @click="inhabilitando = null">Cancelar</button>
-          <button class="btn btn-primary">Inhabilitar</button>
+          <button class="btn btn-danger btn-danger-solid">Inhabilitar</button>
         </div>
       </form>
     </ModalDialog>
@@ -232,12 +260,74 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.notificaciones { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
-.estado-socio { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.motivo p { margin: 0 0 10px; }
-.motivo blockquote {
-  margin: 0 0 14px; padding: 10px 14px; border-left: 3px solid var(--critical);
-  background: var(--critical-bg); color: var(--critical-ink); border-radius: 0 8px 8px 0;
+.filtros { margin-bottom: var(--space-4); }
+.buscador { position: relative; }
+.buscador .lupa { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.buscador input { padding-left: 36px; }
+
+/* Avatar con iniciales */
+.avatar {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.02em;
 }
-.notificaciones li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+.avatar.inhabilitado { background: var(--critical-bg); color: var(--critical-ink); }
+.avatar.grande { width: 52px; height: 52px; font-size: var(--text-lg); }
+
+/* Lista */
+.persona { display: flex; align-items: center; gap: var(--space-3); min-width: 160px; }
+.datos { display: grid; min-width: 0; }
+.nombre { font-weight: 600; color: var(--ink); }
+.email { font-size: var(--text-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dni { color: var(--ink-2); white-space: nowrap; }
+.fecha-celda { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.estado-socio { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.derecha { justify-content: flex-end; flex-wrap: nowrap; gap: var(--space-1); }
+.solo-icono { width: 32px; padding: 0; }
+
+/* Ficha del socio */
+.detalle { position: sticky; top: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
+.ficha {
+  display: flex; align-items: flex-start; gap: var(--space-4);
+  padding-bottom: var(--space-4); border-bottom: 1px solid var(--border);
+}
+.ficha-datos { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.contacto { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); color: var(--ink-2); }
+.contacto li { display: inline-flex; align-items: center; gap: 5px; overflow-wrap: anywhere; }
+.contacto svg { color: var(--muted); flex: none; }
+
+.subtitulo {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--text-xs); font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.cuenta {
+  padding: 0 7px; border-radius: var(--radius-pill); background: var(--surface-2);
+  color: var(--ink-2); font-size: var(--text-xs); letter-spacing: 0; font-variant-numeric: tabular-nums;
+}
+.con-margen { margin-bottom: var(--space-2); }
+.titulo-prestamo { display: block; font-weight: 550; }
+
+.notificaciones { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.notificaciones li {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px var(--space-3);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 14px;
+}
+.icono-aviso { grid-row: span 2; margin-top: 2px; color: var(--accent); }
+.notificaciones time { color: var(--muted); font-size: var(--text-xs); }
+
+.sin-seleccion {
+  display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-10) var(--space-5);
+  text-align: center; color: var(--muted);
+}
+.sin-seleccion svg { color: var(--accent); opacity: 0.7; }
+
+/* Modal de motivo */
+.motivo p { margin: 0 0 var(--space-3); }
+.motivo blockquote {
+  margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border-left: 3px solid var(--critical);
+  background: var(--critical-bg); color: var(--critical-ink); border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-size: 15px;
+}
+
+@media (max-width: 980px) { .detalle { position: static; } }
 </style>

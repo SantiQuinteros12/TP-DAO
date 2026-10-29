@@ -9,6 +9,7 @@
  * Teclado: ↑/↓ para moverse, Enter para elegir, Esc para cerrar.
  */
 import { computed, ref, watch } from 'vue'
+import { LoaderCircle, Search, X } from 'lucide-vue-next'
 
 const props = defineProps({
   modelValue: { type: [String, Number], default: null },
@@ -123,7 +124,7 @@ function partes(cadena) {
 
 <template>
   <div class="typeahead" :class="{ 'con-valor': elegido }">
-    <span class="lupa" aria-hidden="true">⌕</span>
+    <Search class="lupa" :size="16" aria-hidden="true" />
     <input
       v-model="texto"
       type="text"
@@ -140,8 +141,8 @@ function partes(cadena) {
       @focus="alEnfocar"
       @blur="abierto = false"
     />
-    <span v-if="cargando" class="estado" aria-hidden="true">…</span>
-    <button v-else-if="texto && !deshabilitado" type="button" class="estado limpiar" aria-label="Borrar búsqueda" @mousedown.prevent="limpiar">✕</button>
+    <LoaderCircle v-if="cargando" class="estado girando" :size="16" aria-hidden="true" />
+    <button v-else-if="texto && !deshabilitado" type="button" class="estado limpiar" aria-label="Borrar búsqueda" @mousedown.prevent="limpiar"><X :size="15" /></button>
     <ul v-if="abierto" :id="`${id}-lista`" class="opciones" role="listbox">
       <li
         v-for="(item, i) in resultados"
@@ -163,30 +164,38 @@ function partes(cadena) {
 
 <style scoped>
 .typeahead { position: relative; }
-.typeahead input { padding-left: 28px; padding-right: 30px; }
+.typeahead input { padding-left: 36px; padding-right: 36px; }
 .lupa {
-  position: absolute; left: 10px; top: 50%; transform: translateY(-52%);
-  color: var(--muted); font-size: 15px; pointer-events: none;
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none;
 }
-.con-valor input { border-color: var(--accent); background: var(--accent-soft); }
+.con-valor input { border-color: var(--accent); background: var(--accent-soft); font-weight: 550; }
+.con-valor .lupa { color: var(--accent); }
 .estado {
   position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
-  color: var(--muted); font-size: 12px;
+  display: grid; place-items: center; color: var(--muted);
 }
-.limpiar { border: 0; background: none; cursor: pointer; padding: 2px 4px; }
+.limpiar {
+  width: 26px; height: 26px; border: 0; border-radius: var(--radius-sm); background: none; cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.limpiar:hover { background: var(--surface-3); color: var(--ink); }
+.girando { animation: girar 0.8s linear infinite; }
+@keyframes girar { to { transform: translateY(-50%) rotate(360deg); } }
 .opciones {
-  position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 4px);
-  margin: 0; padding: 4px; list-style: none; max-height: 280px; overflow-y: auto;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  position: absolute; z-index: 60; left: 0; right: 0; top: calc(100% + 6px);
+  margin: 0; padding: var(--space-1); list-style: none; max-height: 300px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); animation: desplegar 140ms var(--ease);
 }
-.opciones li { display: grid; gap: 1px; padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.opciones li { display: grid; gap: 2px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; }
 .opciones li.activo { background: var(--accent-soft); }
-.texto { font-size: 13.5px; }
-.detalle { font-size: 12px; color: var(--muted); }
+.texto { font-size: 14.5px; font-weight: 500; color: var(--ink); }
+.detalle { font-size: var(--text-sm); color: var(--muted); }
 mark {
-  background: none; color: inherit; font-weight: 650;
-  text-decoration: underline; text-decoration-color: var(--accent);
+  background: none; color: inherit; font-weight: 700;
+  text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 2px;
 }
-.vacio { color: var(--muted); cursor: default; font-size: 13px; }
+.vacio { color: var(--muted); cursor: default; font-size: 14px; }
+@keyframes desplegar { from { opacity: 0; transform: translateY(-4px); } }
 </style>

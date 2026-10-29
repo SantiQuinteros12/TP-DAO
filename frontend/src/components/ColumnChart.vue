@@ -112,10 +112,10 @@ const n = (v) => (v ?? 0).toLocaleString('es-AR')
 svg { display: block; width: 100%; height: auto; overflow: visible; }
 .grilla line { stroke: var(--grid); stroke-width: 1; }
 .grilla line.base { stroke: var(--axis); }
-.grilla text, .eje-x { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.grilla text, .eje-x { font-size: 12px; fill: var(--muted); font-variant-numeric: tabular-nums; }
 .hover { fill: transparent; pointer-events: all; }
 .hover.on { fill: var(--surface-2); }
 .barra { pointer-events: none; }
-.leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--ink-2); }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 0; padding: 0; font-size: var(--text-sm); color: var(--ink-2); }
 .leyenda li { display: inline-flex; align-items: center; gap: 6px; }
 </style>

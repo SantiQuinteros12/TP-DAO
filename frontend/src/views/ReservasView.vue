@@ -11,6 +11,7 @@ import TypeAhead from '../components/TypeAhead.vue'
 import { buscar, catalogoApi, reservasApi, sedesApi } from '../services/api'
 import { ejecutar, useToast } from '../composables/useToast'
 import { etiqueta, fecha } from '../composables/formato'
+import { CalendarClock, CircleCheck, Plus, TimerReset } from 'lucide-vue-next'
 
 const toast = useToast()
 const reservas = ref([])
@@ -87,15 +88,20 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Reservas</h1>
+      <div>
+        <h1>Reservas</h1>
+        <p>Cola de espera por libro y sede, asignada por orden de llegada.</p>
+      </div>
       <div class="btn-group">
-        <button class="btn" @click="procesarVencimientos">Procesar vencimientos</button>
-        <button class="btn btn-primary" @click="abrirNueva">+ Nueva reserva</button>
+        <button class="btn" title="Vence las reservas disponibles que no se retiraron a tiempo" @click="procesarVencimientos">
+          <TimerReset aria-hidden="true" /> Procesar vencimientos
+        </button>
+        <button class="btn btn-primary" @click="abrirNueva"><Plus aria-hidden="true" /> Nueva reserva</button>
       </div>
     </header>
 
     <div class="card">
-      <div class="toolbar" style="margin-bottom: 12px">
+      <div class="toolbar filtros">
         <select v-model="filtros.estado">
           <option value="">Todos los estados</option>
           <option v-for="e in ESTADOS" :key="e" :value="e">{{ etiqueta(e) }}</option>
@@ -104,26 +110,28 @@ onMounted(async () => {
           <option value="">Todas las sedes</option>
           <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
+        <span class="contador">{{ reservas.length }} reservas</span>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>#</th><th>Socio</th><th>Libro</th><th>Sede de retiro</th><th>Reservada</th><th>Ejemplar asignado</th><th>Estado</th><th /></tr>
+            <tr><th class="num">#</th><th>Socio</th><th>Libro</th><th>Sede de retiro</th><th>Reservada</th><th>Ejemplar asignado</th><th>Estado</th><th /></tr>
           </thead>
           <tbody>
-            <tr v-for="r in reservas" :key="r.id">
-              <td class="muted">{{ r.id }}</td>
-              <td>{{ r.socio }}</td>
-              <td>{{ r.titulo }}</td>
-              <td>{{ r.sede }}</td>
-              <td class="small">{{ fecha(r.fecha_reserva) }}</td>
-              <td class="small">
-                <span v-if="r.codigo_inventario" class="mono">{{ r.codigo_inventario }}</span>
-                <div v-if="r.fecha_limite_retiro" class="muted">Retirar hasta {{ fecha(r.fecha_limite_retiro) }}</div>
+            <tr v-for="r in reservas" :key="r.id" :class="{ lista: r.estado === 'DISPONIBLE' }">
+              <td class="num id">{{ r.id }}</td>
+              <td class="socio">{{ r.socio }}</td>
+              <td class="libro">{{ r.titulo }}</td>
+              <td class="sede">{{ r.sede }}</td>
+              <td class="fecha-celda">{{ fecha(r.fecha_reserva) }}</td>
+              <td class="asignado">
+                <span v-if="r.codigo_inventario" class="mono codigo"><CircleCheck :size="13" aria-hidden="true" /> {{ r.codigo_inventario }}</span>
+                <span v-else class="muted">{{ r.estado === 'PENDIENTE' ? 'En espera' : '—' }}</span>
+                <span v-if="r.fecha_limite_retiro" class="limite" :class="{ vigente: r.estado === 'DISPONIBLE' }"><CalendarClock :size="13" aria-hidden="true" /> Retirar hasta {{ fecha(r.fecha_limite_retiro) }}</span>
               </td>
               <td><EstadoBadge :estado="r.estado" /></td>
               <td class="actions">
-                <div class="btn-group" style="justify-content: flex-end">
+                <div class="btn-group derecha">
                   <button v-if="r.estado === 'DISPONIBLE'" class="btn btn-sm btn-primary" @click="accion(() => reservasApi.concretar(r.id), 'Reserva concretada: préstamo registrado')">Concretar préstamo</button>
                   <button v-if="['PENDIENTE', 'DISPONIBLE'].includes(r.estado)" class="btn btn-sm btn-danger" @click="accion(() => reservasApi.cancelar(r.id), 'Reserva cancelada')">Cancelar</button>
                 </div>
@@ -131,7 +139,7 @@ onMounted(async () => {
             </tr>
           </tbody>
         </table>
-        <p v-if="!reservas.length" class="empty">No hay reservas.</p>
+        <p v-if="!reservas.length" class="empty">No hay reservas para los filtros elegidos.</p>
       </div>
     </div>
 
@@ -171,7 +179,7 @@ onMounted(async () => {
           </select>
         </CampoForm>
         <div class="form-actions">
-          <span v-if="faltante" class="small muted" style="margin-right: auto; align-self: center">{{ faltante }}</span>
+          <span v-if="faltante" class="small muted faltante">{{ faltante }}</span>
           <button type="button" class="btn" @click="nueva = null">Cancelar</button>
           <button class="btn btn-primary" :disabled="!!faltante">Reservar</button>
         </div>
@@ -179,3 +187,30 @@ onMounted(async () => {
     </ModalDialog>
   </section>
 </template>
+
+<style scoped>
+.filtros { margin-bottom: var(--space-4); }
+.contador {
+  margin-left: auto; padding: 4px 10px; border-radius: var(--radius-pill);
+  background: var(--surface-2); font-size: var(--text-sm); font-weight: 550; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.id { color: var(--muted); font-size: var(--text-sm); width: 1%; }
+.socio { font-weight: 550; min-width: 130px; }
+.libro { font-weight: 550; color: var(--ink); min-width: 150px; }
+.sede { font-size: var(--text-sm); color: var(--ink-2); }
+.fecha-celda { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.asignado { font-size: var(--text-sm); }
+.codigo { display: inline-flex; align-items: center; gap: 5px; color: var(--good-ink); font-weight: 600; }
+.limite {
+  display: flex; align-items: center; gap: 5px; margin-top: 4px; width: fit-content; white-space: nowrap;
+  font-size: var(--text-xs); color: var(--muted);
+}
+/* Plazo de retiro corriendo: se destaca */
+.limite.vigente { padding: 1px 8px; border-radius: var(--radius-sm); background: var(--warning-bg); color: var(--warning-ink); font-weight: 650; }
+/* Reserva con ejemplar listo para retirar: se destaca para concretarla */
+tr.lista td:first-child { box-shadow: inset 3px 0 0 var(--good); }
+.derecha { justify-content: flex-end; flex-wrap: nowrap; }
+.faltante { margin-right: auto; align-self: center; }
+@media (max-width: 520px) { .faltante { flex: 1 1 100%; } }
+</style>

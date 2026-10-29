@@ -28,14 +28,15 @@ const maximo = computed(() => Math.max(1, ...props.datos.map((d) => d.valor)))
 </template>
 
 <style scoped>
-.barras { display: grid; gap: 8px; }
-.fila { display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: 10px; align-items: center; }
-.etiqueta { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barras { display: grid; gap: 10px; }
+.fila { display: grid; grid-template-columns: minmax(110px, 38%) 1fr; gap: 12px; align-items: center; border-radius: var(--radius-sm); }
+.etiqueta { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pista { display: flex; align-items: center; gap: 6px; min-width: 0; border-left: 1px solid var(--axis); }
 .barra {
-  height: 18px; min-width: 2px; background: var(--series-1);
-  border-radius: 0 4px 4px 0;
+  height: 20px; min-width: 2px; background: var(--series-1);
+  border-radius: 0 4px 4px 0; transition: filter var(--dur) var(--ease), width 300ms var(--ease);
 }
-.fila:hover .barra { filter: brightness(1.1); }
-.valor { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.fila:hover .barra { filter: brightness(1.12); }
+.fila:hover .etiqueta { color: var(--ink); }
+.valor { font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
 </style>

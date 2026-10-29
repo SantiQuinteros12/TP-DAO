@@ -14,6 +14,10 @@ import { buscar, catalogoApi, sedesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { etiqueta } from '../composables/formato'
 import { r, useValidacion } from '../composables/validacion'
+import {
+  ArrowRightLeft, Bookmark, BookOpen, ChevronDown, ChevronRight, CircleCheck, Hourglass, OctagonAlert,
+  Pencil, Plus, Search, Truck, Wrench, X
+} from 'lucide-vue-next'
 
 const router = useRouter()
 const sedes = ref([])
@@ -21,11 +25,11 @@ const sedesActivas = computed(() => sedes.value.filter((s) => s.activa))
 
 /** Estados que se totalizan, en orden de prioridad para el estado del libro. */
 const ESTADOS = [
-  { clave: 'disponibles', estado: 'DISPONIBLE', nombre: 'Disponible', tono: 'good', icono: '●' },
-  { clave: 'prestados', estado: 'EN_PRESTAMO', nombre: 'Prestado', tono: 'info', icono: '◆' },
-  { clave: 'reservados', estado: 'RESERVADO', nombre: 'Reservado', tono: 'warning', icono: '▲' },
-  { clave: 'en_transito', estado: 'EN_TRANSITO', nombre: 'En tránsito', tono: 'info', icono: '➜' },
-  { clave: 'danados', estado: 'DANADO', nombre: 'Dañado', tono: 'serious', icono: '◼' }
+  { clave: 'disponibles', estado: 'DISPONIBLE', nombre: 'Disponible', tono: 'good', icono: CircleCheck },
+  { clave: 'prestados', estado: 'EN_PRESTAMO', nombre: 'Prestado', tono: 'info', icono: BookOpen },
+  { clave: 'reservados', estado: 'RESERVADO', nombre: 'Reservado', tono: 'reserved', icono: Bookmark },
+  { clave: 'en_transito', estado: 'EN_TRANSITO', nombre: 'En tránsito', tono: 'transit', icono: ArrowRightLeft },
+  { clave: 'danados', estado: 'DANADO', nombre: 'Dañado', tono: 'critical', icono: OctagonAlert }
 ]
 const ESTADO_POR_CODIGO = Object.fromEntries(ESTADOS.map((e) => [e.estado, e]))
 
@@ -243,10 +247,13 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Catálogo de libros</h1>
+      <div>
+        <h1>Catálogo de libros</h1>
+        <p>Títulos de la red y sus ejemplares físicos en cada sede.</p>
+      </div>
       <div class="btn-group">
-        <button class="btn" @click="abrirEjemplar()">+ Ejemplar</button>
-        <button class="btn btn-primary" @click="abrirLibro()">+ Libro</button>
+        <button class="btn" @click="abrirEjemplar()"><Plus aria-hidden="true" /> Ejemplar</button>
+        <button class="btn btn-primary" @click="abrirLibro()"><Plus aria-hidden="true" /> Libro</button>
       </div>
     </header>
 
@@ -261,47 +268,50 @@ onMounted(async () => {
         :aria-pressed="filtroEstado === e.clave"
         @click="filtroEstado = filtroEstado === e.clave ? '' : e.clave"
       >
-        <span class="total-nombre"><span aria-hidden="true">{{ e.icono }}</span> {{ e.nombre }}</span>
+        <span class="total-nombre"><component :is="e.icono" :size="15" aria-hidden="true" /> {{ e.nombre }}</span>
         <strong>{{ totales[e.clave] }}</strong>
         <span class="total-pie">ejemplares</span>
       </button>
     </div>
 
     <div class="card">
-      <div class="toolbar" style="margin-bottom: 12px">
-        <div class="grow"><input v-model="q" type="search" placeholder="Buscar por título, autor o ISBN…" /></div>
-        <button v-if="filtroEstado" class="btn btn-sm" @click="filtroEstado = ''">
-          Con ejemplares «{{ ESTADOS.find((e) => e.clave === filtroEstado).nombre }}» ✕
+      <div class="toolbar filtros">
+        <div class="grow buscador">
+          <Search class="lupa" :size="16" aria-hidden="true" />
+          <input v-model="q" type="search" placeholder="Buscar por título, autor o ISBN…" />
+        </div>
+        <button v-if="filtroEstado" class="filtro-activo" @click="filtroEstado = ''">
+          Con ejemplares «{{ ESTADOS.find((e) => e.clave === filtroEstado).nombre }}» <X :size="14" aria-label="Quitar filtro" />
         </button>
-        <span class="small muted">{{ visibles.length }} libros</span>
+        <span class="contador">{{ visibles.length }} libros</span>
       </div>
 
       <div class="table-wrap">
         <table class="libros">
           <thead>
-            <tr><th class="col-chevron" /><th>Libro</th><th>ISBN</th><th>Género</th><th>Año</th><th>Estado actual</th><th class="num">Ejemplares</th><th /></tr>
+            <tr><th class="col-chevron" /><th>Libro</th><th>ISBN</th><th>Género</th><th class="num">Año</th><th>Estado actual</th><th class="num">Ejemplares</th><th /></tr>
           </thead>
           <tbody>
             <template v-for="l in visibles" :key="l.isbn">
               <tr class="clickable fila-libro" :class="{ selected: abierto === l.isbn }" @click="alternar(l)">
                 <td class="col-chevron">
-                  <span class="chevron" :class="{ girado: abierto === l.isbn }" aria-hidden="true">›</span>
+                  <ChevronRight class="chevron" :class="{ girado: abierto === l.isbn }" :size="18" aria-hidden="true" />
                 </td>
-                <td><strong>{{ l.titulo }}</strong><br /><span class="small muted">{{ l.autor }}</span></td>
-                <td class="mono">{{ l.isbn }}</td>
-                <td class="small">{{ l.genero || '—' }}</td>
-                <td class="small">{{ l.anio_publicacion || '—' }}</td>
+                <td class="libro"><span class="titulo">{{ l.titulo }}</span><span class="autor">{{ l.autor }}</span></td>
+                <td class="mono isbn">{{ l.isbn }}</td>
+                <td><span v-if="l.genero" class="genero">{{ l.genero }}</span><span v-else class="muted">—</span></td>
+                <td class="num small">{{ l.anio_publicacion || '—' }}</td>
                 <td>
                   <EstadoBadge v-if="estadoLibro(l.isbn)" :estado="estadoLibro(l.isbn).estado" />
                   <span v-else class="small muted">Sin ejemplares</span>
                 </td>
-                <td class="num">{{ conteoDe(l.isbn).total }}</td>
+                <td class="num total-ej">{{ conteoDe(l.isbn).total }}</td>
                 <td class="actions" @click.stop>
-                  <div class="btn-group" style="justify-content: flex-end">
+                  <div class="btn-group derecha">
                     <button class="btn btn-sm" :aria-expanded="abierto === l.isbn" @click="alternar(l)">
-                      Ejemplares {{ abierto === l.isbn ? '▴' : '▾' }}
+                      Ejemplares <ChevronDown class="giro" :class="{ girado: abierto === l.isbn }" aria-hidden="true" />
                     </button>
-                    <button class="btn btn-sm" @click="abrirLibro(l)">Editar</button>
+                    <button class="btn btn-sm btn-ghost" @click="abrirLibro(l)"><Pencil aria-hidden="true" /> Editar</button>
                   </div>
                 </td>
               </tr>
@@ -318,11 +328,11 @@ onMounted(async () => {
                           class="chip"
                           :class="[e.tono, { cero: !conteoDe(l.isbn)[e.clave] }]"
                         >
-                          <span aria-hidden="true">{{ e.icono }}</span> {{ e.nombre }} <strong>{{ conteoDe(l.isbn)[e.clave] }}</strong>
+                          <component :is="e.icono" :size="13" aria-hidden="true" /> {{ e.nombre }} <strong>{{ conteoDe(l.isbn)[e.clave] }}</strong>
                         </span>
-                        <span v-if="conteoDe(l.isbn).en_espera" class="chip">⏳ Reservas en espera <strong>{{ conteoDe(l.isbn).en_espera }}</strong></span>
+                        <span v-if="conteoDe(l.isbn).en_espera" class="chip warning"><Hourglass :size="13" aria-hidden="true" /> Reservas en espera <strong>{{ conteoDe(l.isbn).en_espera }}</strong></span>
                       </div>
-                      <button class="btn btn-sm" @click="abrirEjemplar(l)">+ Agregar ejemplar</button>
+                      <button class="btn btn-sm" @click="abrirEjemplar(l)"><Plus aria-hidden="true" /> Agregar ejemplar</button>
                     </div>
 
                     <p v-if="!porSede.length" class="empty">Este libro todavía no tiene ejemplares.</p>
@@ -330,7 +340,7 @@ onMounted(async () => {
                     <!-- Acordeón de disponibilidad por sede -->
                     <div v-for="g in porSede" :key="g.sede_id" class="sede" :class="{ abierta: sedesAbiertas.has(g.sede_id) }">
                       <button type="button" class="sede-cabecera" :aria-expanded="sedesAbiertas.has(g.sede_id)" @click="alternarSede(g.sede_id)">
-                        <span class="chevron" :class="{ girado: sedesAbiertas.has(g.sede_id) }" aria-hidden="true">›</span>
+                        <ChevronRight class="chevron" :class="{ girado: sedesAbiertas.has(g.sede_id) }" :size="16" aria-hidden="true" />
                         <span class="sede-nombre">
                           {{ g.sede }} <span v-if="!g.activa" class="small muted">(baja)</span>
                         </span>
@@ -349,7 +359,7 @@ onMounted(async () => {
                             <span aria-hidden="true" :class="['punto', e.clave]" />{{ g.conteo[e.clave] }}
                           </span>
                         </span>
-                        <span class="small muted">{{ enUso(g) }} ej.</span>
+                        <span class="en-uso">{{ enUso(g) }} ej.</span>
                       </button>
 
                       <div v-if="sedesAbiertas.has(g.sede_id)" class="sede-detalle">
@@ -360,11 +370,11 @@ onMounted(async () => {
                               <td class="mono">{{ e.codigo_inventario }}</td>
                               <td class="small" :class="{ muted: e.sede_actual_id === e.sede_id }">{{ e.sede_actual }}</td>
                               <td><EstadoBadge :estado="e.estado" /></td>
-                              <td class="small">{{ etiqueta(e.condicion) }}</td>
+                              <td><span class="condicion" :class="e.condicion.toLowerCase()">{{ etiqueta(e.condicion) }}</span></td>
                               <td class="actions">
-                                <div class="btn-group" style="justify-content: flex-end">
-                                  <button v-if="e.estado === 'DISPONIBLE'" class="btn btn-sm" @click="trasladando = e; sedeTraslado = ''">Trasladar</button>
-                                  <button v-if="e.estado === 'DANADO'" class="btn btn-sm" @click="accionEjemplar(() => catalogoApi.repararEjemplar(e.id), 'Ejemplar reincorporado')">Reparar</button>
+                                <div class="btn-group derecha">
+                                  <button v-if="e.estado === 'DISPONIBLE'" class="btn btn-sm" @click="trasladando = e; sedeTraslado = ''"><Truck aria-hidden="true" /> Trasladar</button>
+                                  <button v-if="e.estado === 'DANADO'" class="btn btn-sm" @click="accionEjemplar(() => catalogoApi.repararEjemplar(e.id), 'Ejemplar reincorporado')"><Wrench aria-hidden="true" /> Reparar</button>
                                   <button v-if="['DISPONIBLE', 'DANADO'].includes(e.estado)" class="btn btn-sm btn-danger" @click="accionEjemplar(() => catalogoApi.bajaEjemplar(e.id), 'Ejemplar dado de baja')">Baja</button>
                                 </div>
                               </td>
@@ -383,7 +393,7 @@ onMounted(async () => {
             </template>
           </tbody>
         </table>
-        <p v-if="!visibles.length" class="empty">Sin resultados.</p>
+        <p v-if="!visibles.length" class="empty">No hay libros que coincidan con la búsqueda.</p>
       </div>
     </div>
 
@@ -480,66 +490,110 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Totalizadores */
-.totales { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
-.total {
-  display: grid; gap: 2px; text-align: left; padding: 12px 14px; cursor: pointer;
-  border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--surface); box-shadow: var(--shadow); font: inherit; color: var(--ink);
-  border-top: 3px solid var(--tono);
-}
-.total:hover { background: var(--surface-2); }
-.total.activo { outline: 2px solid var(--tono); outline-offset: -1px; background: var(--tono-bg); }
-.total strong { font-size: 24px; font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.total-nombre { font-size: 12.5px; color: var(--tono-ink); font-weight: 600; }
-.total-pie { font-size: 11.5px; color: var(--muted); }
+/* Tonos por estado de ejemplar (mismos colores que las insignias) */
 .good { --tono: var(--good); --tono-ink: var(--good-ink); --tono-bg: var(--good-bg); }
-.info { --tono: var(--accent); --tono-ink: var(--info-ink); --tono-bg: var(--info-bg); }
-.warning { --tono: var(--warning); --tono-ink: var(--warning-ink); --tono-bg: var(--warning-bg); }
-.serious { --tono: var(--serious); --tono-ink: var(--serious-ink); --tono-bg: var(--serious-bg); }
+.info { --tono: var(--info); --tono-ink: var(--info-ink); --tono-bg: var(--info-bg); }
+.reserved { --tono: var(--reserved); --tono-ink: var(--reserved-ink); --tono-bg: var(--reserved-bg); }
+.transit { --tono: var(--accent); --tono-ink: var(--accent); --tono-bg: var(--accent-soft); }
+.critical { --tono: var(--critical); --tono-ink: var(--critical-ink); --tono-bg: var(--critical-bg); }
+.chip.transit { background: var(--accent-soft); color: var(--accent); }
 
-/* Tabla de libros + acordeón */
-.col-chevron { width: 28px; padding-right: 0; }
-.chevron {
-  display: inline-block; font-size: 18px; line-height: 1; color: var(--muted);
-  transition: transform 0.15s;
+/* Totalizadores (también filtran) */
+.totales { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.total {
+  position: relative; display: grid; gap: 2px; text-align: left; padding: var(--space-4); cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  background: var(--surface); box-shadow: var(--shadow); font: inherit; color: var(--ink);
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), transform 80ms var(--ease);
 }
+.total::before { content: ''; position: absolute; inset: 0 0 auto; height: 3px; background: var(--tono); }
+.total:hover { border-color: var(--tono); }
+.total:active { transform: translateY(1px); }
+.total:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+.total.activo { border-color: var(--tono); background: var(--tono-bg); box-shadow: inset 0 0 0 1px var(--tono); }
+.total strong { font-size: 28px; font-weight: 700; line-height: 1.2; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.total-nombre { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); color: var(--tono-ink); font-weight: 650; }
+.total-pie { font-size: var(--text-xs); color: var(--muted); }
+
+/* Barra de búsqueda */
+.filtros { margin-bottom: var(--space-4); }
+.buscador { position: relative; }
+.buscador .lupa { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.buscador input { padding-left: 36px; }
+.filtro-activo {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px 0 12px;
+  border: 1px solid var(--accent); border-radius: var(--radius-pill); background: var(--accent-soft); color: var(--accent);
+  font: inherit; font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+}
+.filtro-activo:hover { background: var(--accent-soft-2); }
+.contador {
+  margin-left: auto; padding: 4px 10px; border-radius: var(--radius-pill);
+  background: var(--surface-2); font-size: var(--text-sm); font-weight: 550; color: var(--ink-2);
+}
+
+/* Tabla de libros */
+.col-chevron { width: 36px; padding-right: 0 !important; }
+.chevron { display: block; color: var(--muted); transition: transform var(--dur) var(--ease), color var(--dur) var(--ease); }
 .chevron.girado { transform: rotate(90deg); color: var(--accent); }
-.detalle-libro > td { padding: 0 0 14px; background: var(--accent-soft); }
+.giro { transition: transform var(--dur) var(--ease); }
+.giro.girado { transform: rotate(180deg); }
+.libro { min-width: 200px; }
+.libro .titulo { display: block; font-weight: 600; color: var(--ink); }
+.libro .autor { display: block; font-size: var(--text-sm); color: var(--muted); }
+.isbn { color: var(--ink-2); white-space: nowrap; }
+.genero {
+  display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--ink-2); font-size: var(--text-xs); font-weight: 600; white-space: nowrap;
+}
+.total-ej { font-weight: 650; }
+.derecha { justify-content: flex-end; flex-wrap: nowrap; }
+
+/* Acordeón del libro */
+.detalle-libro > td { padding: 0 var(--space-3) var(--space-4) !important; background: var(--accent-soft); }
 .detalle-libro:hover > td { background: var(--accent-soft); }
 .panel-libro {
-  display: grid; gap: 10px; margin: 0 10px; padding: 14px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  display: grid; gap: var(--space-3); padding: var(--space-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); animation: desplegar 180ms var(--ease);
 }
-.panel-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel-cabecera { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 
-.sede { border: 1px solid var(--grid); border-radius: 10px; overflow: hidden; }
-.sede.abierta { border-color: var(--axis); }
+.sede { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; transition: border-color var(--dur) var(--ease); }
+.sede.abierta { border-color: var(--border-strong); }
 .sede-cabecera {
   display: grid; grid-template-columns: 18px minmax(130px, 1.2fr) minmax(80px, 1fr) auto auto;
-  align-items: center; gap: 12px; width: 100%; padding: 10px 12px;
+  align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3) var(--space-4);
   border: 0; background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer;
+  transition: background var(--dur) var(--ease);
 }
 .sede-cabecera:hover { background: var(--surface-2); }
+.sede-cabecera:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
 .sede-nombre { font-weight: 600; }
-.barra { display: flex; gap: 2px; height: 10px; border-radius: 999px; overflow: hidden; background: var(--grid); }
+.barra { display: flex; gap: 2px; height: 10px; border-radius: var(--radius-pill); overflow: hidden; background: var(--grid); }
 .segmento { min-width: 4px; }
-.conteos { display: flex; gap: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
-.conteos > span { display: inline-flex; align-items: center; gap: 4px; }
+.conteos { display: flex; gap: var(--space-3); font-size: var(--text-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.conteos > span { display: inline-flex; align-items: center; gap: 5px; }
 .conteos .cero { opacity: 0.35; }
-.punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.en-uso { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
+.punto { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 .disponibles { background: var(--good); }
-.prestados { background: var(--series-1); }
-.reservados { background: var(--warning); }
-.en_transito { background: var(--info-ink); }
-.danados { background: var(--serious); }
-.sede-detalle { padding: 4px 12px 8px; border-top: 1px solid var(--grid); background: var(--surface-2); }
+.prestados { background: var(--info); }
+.reservados { background: var(--reserved); }
+.en_transito { background: var(--accent); }
+.danados { background: var(--critical); }
+.sede-detalle { padding: 0; border-top: 1px solid var(--border); background: var(--surface-2); overflow-x: auto; }
+.sede-detalle th { position: static; background: transparent; }
+.sede-detalle th:first-child, .sede-detalle td:first-child { padding-left: var(--space-4); }
 .sede-detalle tbody tr:hover td { background: transparent; }
-.leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--ink-2); }
+.condicion { font-size: var(--text-sm); font-weight: 600; color: var(--good-ink); }
+.condicion.deteriorada { color: var(--warning-ink); }
+.condicion.danada { color: var(--critical-ink); }
+.leyenda { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); list-style: none; margin: 0; padding: 0; font-size: var(--text-sm); color: var(--ink-2); }
 .leyenda li { display: inline-flex; align-items: center; gap: 6px; }
 
 @media (max-width: 720px) {
   .sede-cabecera { grid-template-columns: 18px 1fr auto; }
   .barra, .conteos { grid-column: 2 / -1; }
 }
+@keyframes desplegar { from { opacity: 0; transform: translateY(-4px); } }
 </style>

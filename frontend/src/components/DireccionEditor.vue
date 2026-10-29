@@ -4,6 +4,7 @@
  * ciudad, provincia y CP) con vista previa y validación por campo.
  */
 import { computed } from 'vue'
+import { MapPin } from 'lucide-vue-next'
 import CampoForm from './CampoForm.vue'
 
 const props = defineProps({
@@ -32,7 +33,7 @@ const vistaPrevia = computed(() => {
 
 <template>
   <fieldset class="direccion">
-    <legend>Dirección</legend>
+    <legend><MapPin :size="15" aria-hidden="true" /> Dirección</legend>
     <div class="fila calle">
       <CampoForm etiqueta="Calle" requerido :error="v.error('calle')" @tocar="v.tocar('calle')">
         <input v-model="dir.calle" placeholder="Av. Colón" maxlength="80" autocomplete="address-line1" />
@@ -67,7 +68,7 @@ const vistaPrevia = computed(() => {
       </CampoForm>
     </div>
     <p v-if="vistaPrevia" class="vista-previa">
-      <span aria-hidden="true">📍</span>
+      <MapPin class="pin" :size="16" aria-hidden="true" />
       <span>{{ vistaPrevia }}</span>
     </p>
   </fieldset>
@@ -75,19 +76,23 @@ const vistaPrevia = computed(() => {
 
 <style scoped>
 .direccion {
-  display: grid; gap: 10px; margin: 0; padding: 12px 14px 14px;
-  border: 1px solid var(--grid); border-radius: 12px;
+  display: grid; gap: var(--space-3); margin: 0; padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--border); border-radius: var(--radius); min-width: 0;
 }
-legend { padding: 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
-.fila { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+legend {
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 6px;
+  font-size: 14px; font-weight: 550; color: var(--ink-2);
+}
+legend svg { color: var(--accent); }
+.fila { display: grid; gap: var(--space-3); grid-template-columns: 1fr 1fr; }
 .fila.calle { grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr); }
 .fila.tres { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(90px, 0.8fr); }
 @media (max-width: 520px) { .fila, .fila.calle, .fila.tres { grid-template-columns: 1fr; } }
-.altura { display: flex; gap: 8px; align-items: center; }
-.sn { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
-.sn input { width: auto; }
+.altura { display: flex; gap: var(--space-2); align-items: center; }
+.sn { display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; cursor: pointer; }
 .vista-previa {
-  display: flex; gap: 8px; align-items: center; margin: 2px 0 0; padding: 8px 10px;
-  border-radius: 8px; background: var(--surface-2); font-size: 13px;
+  display: flex; gap: var(--space-2); align-items: center; margin: 2px 0 0; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md); background: var(--accent-soft); color: var(--ink); font-size: 14px;
 }
+.pin { flex: none; color: var(--accent); }
 </style>

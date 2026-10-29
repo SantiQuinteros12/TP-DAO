@@ -17,6 +17,7 @@ import DonutChart from '../components/DonutChart.vue'
 import EstadoBadge from '../components/EstadoBadge.vue'
 import StackedBar from '../components/StackedBar.vue'
 import StatTile from '../components/StatTile.vue'
+import { CalendarDays, CalendarRange } from 'lucide-vue-next'
 import { reportesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { etiqueta, fecha, moneda, numero } from '../composables/formato'
@@ -158,8 +159,11 @@ const horas = (h) => {
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Reportes de gestión</h1>
-      <span class="small muted">Al {{ fecha(isoDia(hoy)) }}</span>
+      <div>
+        <h1>Reportes de gestión</h1>
+        <p>Actividad de préstamos, disponibilidad del catálogo y logística de la red.</p>
+      </div>
+      <span class="fecha-corte"><CalendarDays :size="16" aria-hidden="true" /> Datos al {{ fecha(isoDia(hoy)) }}</span>
     </header>
 
     <!-- KPIs -->
@@ -172,18 +176,20 @@ const horas = (h) => {
 
     <!-- Filtro de período (aplica a 3, 5 y 6) -->
     <div class="card periodo">
-      <strong>Período</strong>
-      <div class="btn-group">
-        <button v-for="r in RANGOS" :key="r.dias" class="btn btn-sm" :class="{ 'btn-primary': periodo.desde === hace(r.dias) && periodo.hasta === isoDia(hoy) }" @click="elegirRango(r.dias)">{{ r.texto }}</button>
+      <span class="periodo-titulo"><CalendarRange :size="18" aria-hidden="true" /> Período</span>
+      <div class="segmentado" role="group" aria-label="Rangos rápidos">
+        <button v-for="r in RANGOS" :key="r.dias" type="button" class="segmento" :class="{ activo: periodo.desde === hace(r.dias) && periodo.hasta === isoDia(hoy) }" @click="elegirRango(r.dias)">{{ r.texto }}</button>
       </div>
-      <label class="toolbar small">Desde <input v-model="periodo.desde" type="date" /></label>
-      <label class="toolbar small">Hasta <input v-model="periodo.hasta" type="date" /></label>
+      <div class="fechas">
+        <label class="fecha-campo"><span>Desde</span><input v-model="periodo.desde" type="date" /></label>
+        <label class="fecha-campo"><span>Hasta</span><input v-model="periodo.hasta" type="date" /></label>
+      </div>
     </div>
 
     <!-- 6. Tendencias -->
     <div class="card">
       <div class="card-header">
-        <h2>6 · Tendencias del período</h2>
+        <h2 class="seccion"><span class="nro" aria-hidden="true">6</span>Tendencias del período</h2>
         <span v-if="cmp" class="small muted">vs. {{ fecha(cmp.anterior_desde) }} – {{ fecha(cmp.anterior_hasta) }}</span>
       </div>
       <div v-if="cmp" class="kpis">
@@ -251,7 +257,7 @@ const horas = (h) => {
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>1 · Préstamos activos y material en tránsito por sede</h2>
+          <h2 class="seccion"><span class="nro" aria-hidden="true">1</span>Préstamos activos y material en tránsito por sede</h2>
         </div>
       </div>
       <div class="table-wrap">
@@ -277,7 +283,7 @@ const horas = (h) => {
         </table>
       </div>
       <template v-if="activos?.en_transito.length">
-        <h3 style="margin: 16px 0 8px">Material actualmente en tránsito</h3>
+        <h3 class="subtitulo separado">Material actualmente en tránsito</h3>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Remito</th><th>Libro</th><th>Ruta</th><th>Estado</th><th class="num">Tiempo en viaje</th></tr></thead>
@@ -299,13 +305,13 @@ const horas = (h) => {
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>2 · Préstamos vencidos y multas acumuladas</h2>
+          <h2 class="seccion"><span class="nro" aria-hidden="true">2</span>Préstamos vencidos y multas acumuladas</h2>
         </div>
         <strong v-if="vencidos" class="total-multas">{{ moneda(vencidos.total_estimado) }}</strong>
       </div>
       <div class="grid-2">
         <div>
-          <h3 style="margin-bottom: 8px">Detalle de vencidos</h3>
+          <h3 class="subtitulo">Detalle de vencidos</h3>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Socio</th><th>Libro</th><th>Sede</th><th class="num">Atraso</th><th class="num">Multa est.</th></tr></thead>
@@ -319,12 +325,12 @@ const horas = (h) => {
                 </tr>
               </tbody>
             </table>
-            <p v-if="!vencidos?.detalle.length" class="empty">No hay préstamos vencidos. 🎉</p>
+            <p v-if="!vencidos?.detalle.length" class="empty">No hay préstamos vencidos.</p>
           </div>
         </div>
         <div>
-          <h3 style="margin-bottom: 8px">Por sede</h3>
-          <div class="table-wrap" style="margin-bottom: 16px">
+          <h3 class="subtitulo">Por sede</h3>
+          <div class="table-wrap con-margen">
             <table>
               <thead><tr><th>Sede</th><th class="num">Vencidos</th><th class="num">Máx. atraso</th><th class="num">Multa est.</th></tr></thead>
               <tbody>
@@ -337,7 +343,7 @@ const horas = (h) => {
               </tbody>
             </table>
           </div>
-          <h3 style="margin-bottom: 8px">Multas registradas en devoluciones (top socios)</h3>
+          <h3 class="subtitulo">Multas registradas en devoluciones (top socios)</h3>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Socio</th><th class="num">Préstamos</th><th class="num">Total</th></tr></thead>
@@ -359,7 +365,7 @@ const horas = (h) => {
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>3 · Libros más solicitados entre sedes</h2>
+            <h2 class="seccion"><span class="nro" aria-hidden="true">3</span>Libros más solicitados entre sedes</h2>
           </div>
         </div>
         <BarChart v-if="barrasSolicitados.length" :datos="barrasSolicitados" unidad="solicitudes" />
@@ -384,7 +390,7 @@ const horas = (h) => {
       <div class="card">
         <div class="card-header">
           <div>
-            <h2>4 · Disponibilidad de catálogo por sede</h2>
+            <h2 class="seccion"><span class="nro" aria-hidden="true">4</span>Disponibilidad de catálogo por sede</h2>
           </div>
         </div>
         <StackedBar :filas="filasDisp" :series="SERIES_DISP" />
@@ -410,7 +416,7 @@ const horas = (h) => {
     <div class="card">
       <div class="card-header">
         <div>
-          <h2>5 · Envíos logísticos: éxito, incidencias y tiempos de tránsito</h2>
+          <h2 class="seccion"><span class="nro" aria-hidden="true">5</span>Envíos logísticos: éxito, incidencias y tiempos de tránsito</h2>
         </div>
       </div>
       <div class="kpis">
@@ -419,9 +425,9 @@ const horas = (h) => {
         <StatTile etiqueta="Tiempo promedio de tránsito" :valor="horas(ind.horas_promedio_transito)" :detalle="`${ind.en_curso ?? 0} en curso · ${ind.extraviados ?? 0} extraviados`" />
         <StatTile etiqueta="Remitos emitidos" :valor="numero(ind.remitos_emitidos)" :detalle="`${ind.cancelados ?? 0} cancelados`" />
       </div>
-      <div class="grid-2" style="margin-top: 16px">
+      <div class="grid-2 separado">
         <div>
-          <h3 style="margin-bottom: 8px">Movimiento por ruta</h3>
+          <h3 class="subtitulo">Movimiento por ruta</h3>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Origen → destino</th><th class="num">Envíos</th><th class="num">Recibidos</th><th class="num">Con incid.</th><th class="num">Prom.</th><th class="num">Mín / máx</th></tr></thead>
@@ -439,8 +445,8 @@ const horas = (h) => {
           </div>
         </div>
         <div>
-          <h3 style="margin-bottom: 8px">Envíos y recepciones por sede</h3>
-          <div class="table-wrap" style="margin-bottom: 16px">
+          <h3 class="subtitulo">Envíos y recepciones por sede</h3>
+          <div class="table-wrap con-margen">
             <table>
               <thead><tr><th>Sede</th><th class="num">Enviados</th><th class="num">Recibidos</th></tr></thead>
               <tbody>
@@ -452,7 +458,7 @@ const horas = (h) => {
               </tbody>
             </table>
           </div>
-          <h3 style="margin-bottom: 8px">Incidencias por tipo</h3>
+          <h3 class="subtitulo">Incidencias por tipo</h3>
           <div class="table-wrap">
             <table>
               <tbody>
@@ -471,14 +477,73 @@ const horas = (h) => {
 </template>
 
 <style scoped>
-.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
-.tortas { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
-@media (max-width: 480px) { .tortas { grid-template-columns: 1fr; } }
-.periodo {
-  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 18px;
-  position: sticky; top: 8px; z-index: 4;
+.fecha-corte {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border-radius: var(--radius-pill); background: var(--surface); border: 1px solid var(--border);
+  font-size: var(--text-sm); color: var(--ink-2);
 }
-.total-multas { font-size: 22px; font-weight: 600; }
-.tabla-datos { margin-top: 14px; }
-.tabla-datos summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
+.fecha-corte svg { color: var(--muted); }
+
+.kpis { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.tortas { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+@media (max-width: 480px) { .tortas { grid-template-columns: 1fr; } }
+
+/* Barra de período: fija al desplazarse */
+.periodo {
+  display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: center;
+  padding: var(--space-3) var(--space-4);
+  position: sticky; top: var(--space-3); z-index: 4;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+@media (max-width: 860px) { .periodo { top: 64px; } }
+.periodo-titulo { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 650; }
+.periodo-titulo svg { color: var(--accent); }
+.segmentado {
+  display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--border); flex-wrap: wrap;
+}
+.segmento {
+  min-height: 30px; padding: 0 var(--space-3); border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--ink-2); font: inherit; font-size: var(--text-sm); font-weight: 550;
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.segmento:hover { color: var(--ink); }
+.segmento.activo { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); font-weight: 650; }
+.segmento:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+.fechas { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-left: auto; }
+.fecha-campo { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--muted); }
+.fecha-campo input { width: auto; min-height: 34px; padding: 4px 10px; font-size: var(--text-sm); }
+@media (max-width: 640px) {
+  .fechas { margin-left: 0; width: 100%; }
+  .fecha-campo { flex: 1 1 140px; }
+  .fecha-campo input { flex: 1; }
+}
+
+/* Encabezados de sección numerados */
+.seccion { display: flex; align-items: center; gap: var(--space-3); }
+.nro {
+  display: inline-grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--accent-soft); color: var(--accent); font-size: var(--text-sm); font-weight: 700;
+}
+.subtitulo {
+  margin-bottom: var(--space-2); font-size: var(--text-xs); font-weight: 650; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.separado { margin-top: var(--space-5); }
+.con-margen { margin-bottom: var(--space-5); }
+
+.total-multas {
+  font-size: var(--text-2xl); font-weight: 700; letter-spacing: -0.02em; color: var(--critical-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-datos { margin-top: var(--space-4); }
+.tabla-datos summary {
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin-bottom: var(--space-2);
+  color: var(--accent); font-weight: 550; list-style-position: inside;
+}
+.tabla-datos summary:hover { color: var(--accent-hover); }
+.tabla-datos table { border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
 </style>

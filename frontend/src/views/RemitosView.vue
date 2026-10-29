@@ -11,6 +11,7 @@ import RemitoTimeline from '../components/RemitoTimeline.vue'
 import { remitosApi, sedesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { ACCIONES_REMITO, etiqueta, fechaHora } from '../composables/formato'
+import { AlertTriangle, ArrowLeft, ArrowRight, History, MousePointerClick, Package } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,16 +109,19 @@ onMounted(async () => {
     <header class="page-header">
       <div class="titulo">
         <RouterLink v-if="volver" :to="volver.ruta" class="volver">
-          <span class="flecha-volver" aria-hidden="true">←</span> {{ volver.texto }}
+          <ArrowLeft class="flecha-volver" :size="16" aria-hidden="true" /> {{ volver.texto }}
         </RouterLink>
-        <h1>Remitos y seguimiento</h1>
+        <div>
+          <h1>Remitos y seguimiento</h1>
+          <p>Envíos, retornos y traslados entre sedes, con su recorrido paso a paso.</p>
+        </div>
       </div>
     </header>
 
     <div class="split">
       <div class="card">
-        <div class="toolbar" style="margin-bottom: 12px">
-          <label class="toolbar small"><input v-model="filtros.en_curso" type="checkbox" style="width: auto" /> Sólo en curso</label>
+        <div class="toolbar filtros">
+          <label class="interruptor"><input v-model="filtros.en_curso" type="checkbox" /> Sólo en curso</label>
           <select v-model="filtros.estado">
             <option value="">Todos los estados</option>
             <option v-for="e in ESTADOS" :key="e" :value="e">{{ etiqueta(e) }}</option>
@@ -142,17 +146,23 @@ onMounted(async () => {
                 :class="{ selected: remito?.id === r.id }"
                 @click="seleccionar(r)"
               >
-                <td>
-                  <span class="mono">R-{{ String(r.id).padStart(6, '0') }}</span><br />
-                  <span class="small muted">{{ etiqueta(r.tipo) }}</span>
+                <td class="nro">
+                  <span class="mono">R-{{ String(r.id).padStart(6, '0') }}</span>
+                  <span class="tipo-remito" :class="r.tipo.toLowerCase()">{{ etiqueta(r.tipo) }}</span>
                 </td>
-                <td>{{ r.titulo }}<br /><span class="small muted mono">{{ r.codigo_inventario }}</span></td>
-                <td class="small">{{ r.sede_origen }}<br />→ {{ r.sede_destino }}</td>
+                <td class="libro">
+                  <span class="titulo">{{ r.titulo }}</span>
+                  <span class="mono codigo">{{ r.codigo_inventario }}</span>
+                </td>
+                <td class="ruta-celda">
+                  <span>{{ r.sede_origen }}</span>
+                  <span class="destino"><ArrowRight :size="13" aria-label="hacia" /> {{ r.sede_destino }}</span>
+                </td>
                 <td>
                   <EstadoBadge :estado="r.estado" />
-                  <div v-if="r.incidencias" class="small" style="color: var(--serious-ink)">⚠ {{ r.incidencias }} incidencia(s)</div>
+                  <span v-if="r.incidencias" class="incidencias"><AlertTriangle :size="13" aria-hidden="true" /> {{ r.incidencias }} incidencia(s)</span>
                 </td>
-                <td class="small">{{ fechaHora(r.ultima_actualizacion) }}</td>
+                <td class="fecha-celda">{{ fechaHora(r.ultima_actualizacion) }}</td>
               </tr>
             </tbody>
           </table>
@@ -162,23 +172,26 @@ onMounted(async () => {
 
       <div class="card detalle">
         <template v-if="remito">
-          <div class="card-header">
-            <div>
-              <h2>{{ remito.numero }} · {{ etiqueta(remito.tipo) }}</h2>
-              <p>{{ remito.titulo }} ({{ remito.codigo_inventario }})</p>
+          <div class="card-header encabezado-remito">
+            <div class="identidad">
+              <span class="icono-remito"><Package :size="20" aria-hidden="true" /></span>
+              <div>
+                <h2><span class="mono">{{ remito.numero }}</span> · {{ etiqueta(remito.tipo) }}</h2>
+                <p>{{ remito.titulo }} <span class="mono">({{ remito.codigo_inventario }})</span></p>
+              </div>
             </div>
             <EstadoBadge :estado="remito.estado" />
           </div>
 
           <div class="ruta">
-            <div><span class="small muted">Origen</span><strong>{{ remito.sede_origen }}</strong></div>
-            <span class="flecha" aria-hidden="true">→</span>
-            <div><span class="small muted">Destino</span><strong>{{ remito.sede_destino }}</strong></div>
+            <div class="extremo"><span class="rotulo">Origen</span><strong>{{ remito.sede_origen }}</strong></div>
+            <span class="trayecto" aria-hidden="true"><ArrowRight :size="18" /></span>
+            <div class="extremo destino-extremo"><span class="rotulo">Destino</span><strong>{{ remito.sede_destino }}</strong></div>
           </div>
-          <p v-if="remito.prestamo_id" class="small muted">Asociado al préstamo #{{ remito.prestamo_id }}</p>
+          <p v-if="remito.prestamo_id" class="asociado">Asociado al préstamo #{{ remito.prestamo_id }}</p>
 
           <div v-if="remito.acciones_disponibles.length" class="acciones">
-            <h3>Acciones disponibles</h3>
+            <h3 class="subtitulo">Acciones disponibles</h3>
             <div class="btn-group">
               <button
                 v-for="a in remito.acciones_disponibles"
@@ -205,7 +218,7 @@ onMounted(async () => {
                 <select v-model="datos.condicion">
                   <option v-for="c in condicionesPosibles" :key="c" :value="c">{{ etiqueta(c) }}</option>
                 </select>
-                <small v-if="condicionActual !== 'BUENA'" class="muted">
+                <small v-if="condicionActual !== 'BUENA'" class="hint">
                   El ejemplar viaja {{ etiqueta(condicionActual).toLowerCase() }}: no puede recibirse en mejor estado.
                   Para volver a «Buena» usá «Reparar» en el catálogo.
                 </small>
@@ -223,25 +236,97 @@ onMounted(async () => {
           </div>
           <p v-else class="alert">Remito finalizado: no admite más operaciones.</p>
 
-          <h3 style="margin: 18px 0 10px">Trazabilidad</h3>
+          <h3 class="subtitulo trazabilidad"><History :size="15" aria-hidden="true" /> Trazabilidad</h3>
           <RemitoTimeline :historial="[...remito.historial].reverse()" />
         </template>
-        <p v-else class="empty">Seleccioná un remito para ver su recorrido y operarlo.</p>
+        <div v-else class="sin-seleccion">
+          <MousePointerClick :size="28" aria-hidden="true" />
+          <p>Seleccioná un remito de la lista para ver su recorrido y operarlo.</p>
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.titulo { display: grid; gap: 10px; }
-.detalle { position: sticky; top: 20px; }
-.ruta {
-  display: flex; align-items: center; gap: 14px; padding: 12px 14px;
-  border-radius: 8px; background: var(--surface-2); margin-bottom: 8px;
+.titulo { display: grid; gap: var(--space-3); }
+.titulo p { margin: var(--space-1) 0 0; color: var(--muted); }
+.filtros { margin-bottom: var(--space-4); }
+.interruptor {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface);
+  font-size: 14px; font-weight: 550; color: var(--ink-2); cursor: pointer; user-select: none;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.ruta div { display: grid; }
-.flecha { font-size: 20px; color: var(--muted); }
-.acciones { display: grid; gap: 10px; margin-top: 14px; }
-.panel { padding: 14px; border: 1px solid var(--grid); border-radius: 8px; }
+.interruptor:hover { background: var(--surface-2); }
+.interruptor:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* Lista */
+.nro .mono { display: block; font-weight: 600; color: var(--ink); }
+.tipo-remito {
+  display: inline-block; margin-top: 4px; padding: 1px 7px; border-radius: var(--radius-sm);
+  font-size: var(--text-xs); font-weight: 600; background: var(--surface-2); color: var(--ink-2);
+}
+.tipo-remito.envio { background: var(--info-bg); color: var(--info-ink); }
+.tipo-remito.retorno { background: var(--reserved-bg); color: var(--reserved-ink); }
+.libro { min-width: 120px; }
+.libro .titulo { display: block; font-weight: 550; }
+.codigo { display: block; margin-top: 2px; font-size: 12px; color: var(--muted); }
+.ruta-celda { font-size: var(--text-sm); color: var(--ink-2); min-width: 110px; }
+.ruta-celda span { display: block; }
+.ruta-celda .destino { display: flex; align-items: center; gap: 4px; }
+.ruta-celda svg { color: var(--muted); flex: none; }
+.incidencias {
+  display: flex; align-items: center; gap: 4px; margin-top: 4px;
+  font-size: var(--text-xs); font-weight: 650; color: var(--warning-ink);
+}
+.fecha-celda { font-size: var(--text-sm); color: var(--ink-2); min-width: 92px; font-variant-numeric: tabular-nums; }
+
+/* Detalle */
+.detalle { position: sticky; top: var(--space-5); display: grid; gap: var(--space-4); align-content: start; }
+.detalle .card-header { margin-bottom: 0; }
+.encabezado-remito { align-items: flex-start; }
+.identidad { display: flex; gap: var(--space-3); align-items: flex-start; min-width: 0; }
+.icono-remito {
+  display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.identidad h2 { font-size: var(--text-lg); }
+.identidad p { margin-top: 2px; font-size: 14px; color: var(--ink-2); }
+
+.ruta {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.extremo { display: grid; gap: 2px; min-width: 0; }
+.destino-extremo { text-align: right; }
+.rotulo { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.extremo strong { font-size: 14.5px; overflow-wrap: anywhere; }
+.trayecto {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border); color: var(--accent);
+}
+.asociado { margin: calc(-1 * var(--space-2)) 0 0; font-size: var(--text-sm); color: var(--muted); }
+
+.subtitulo {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--text-xs); font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.acciones { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+.panel {
+  padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-2); animation: aparecer 160ms var(--ease);
+}
+.panel input, .panel select, .panel textarea { background: var(--surface); }
+.trazabilidad { padding-top: var(--space-4); border-top: 1px solid var(--border); }
+
+.sin-seleccion {
+  display: grid; justify-items: center; gap: var(--space-3); padding: var(--space-10) var(--space-5);
+  text-align: center; color: var(--muted);
+}
+.sin-seleccion svg { color: var(--accent); opacity: 0.7; }
+
 @media (max-width: 980px) { .detalle { position: static; } }
+@keyframes aparecer { from { opacity: 0; transform: translateY(-4px); } }
 </style>

@@ -4,6 +4,7 @@
  * selección de días y horas (sin escribir texto libre).
  */
 import { computed } from 'vue'
+import { AlertTriangle, Clock, Plus, X } from 'lucide-vue-next'
 import { DIAS, DIAS_INICIAL, HORAS, PRESETS, copiarFranjas, errorHorario, textoHorario } from '../composables/horario'
 
 const franjas = defineModel({ type: Array, required: true })
@@ -70,44 +71,56 @@ function quitar(i) {
           <option v-for="h in HORAS" :key="h" :value="h">{{ h }}</option>
         </select>
       </div>
-      <button type="button" class="quitar" :aria-label="`Quitar franja ${i + 1}`" @click="quitar(i)">✕</button>
+      <button type="button" class="quitar" :aria-label="`Quitar franja ${i + 1}`" @click="quitar(i)"><X :size="16" /></button>
     </div>
 
-    <button v-if="franjas.length < 7" type="button" class="btn btn-sm agregar" @click="agregar">+ Agregar franja</button>
+    <button v-if="franjas.length < 7" type="button" class="btn btn-sm agregar" @click="agregar"><Plus aria-hidden="true" /> Agregar franja</button>
 
     <p class="resumen" :class="{ error: error }">
-      <span aria-hidden="true">{{ error ? '⚠' : '🕘' }}</span>
+      <component :is="error ? AlertTriangle : Clock" class="icono-resumen" :size="16" aria-hidden="true" />
       {{ error || resumen }}
     </p>
   </div>
 </template>
 
 <style scoped>
-.horario { display: grid; gap: 10px; }
+.horario { display: grid; gap: var(--space-3); }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset {
-  padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 12.5px; cursor: pointer;
+  min-height: 30px; padding: 0 12px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: var(--text-sm); font-weight: 550; cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .preset:hover { background: var(--surface-2); }
-.preset.activo { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.preset:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
+.preset.activo { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .franja {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
-  padding: 10px; border: 1px solid var(--grid); border-radius: 10px; background: var(--surface-2);
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2);
 }
-.dias { display: flex; gap: 4px; }
+.dias { display: flex; gap: 4px; flex-wrap: wrap; }
 .dia {
-  width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--axis);
-  background: var(--surface); color: var(--ink-2); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-strong);
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: var(--text-sm); font-weight: 650; cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
+.dia:hover { border-color: var(--accent); }
+.dia:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus); }
 .dia.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.horas { display: flex; align-items: center; gap: 6px; }
-.horas select { width: auto; }
-.quitar { margin-left: auto; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; }
+.horas { display: flex; align-items: center; gap: var(--space-2); }
+.horas select { width: auto; min-height: 36px; }
+.quitar {
+  display: grid; place-items: center; width: 32px; height: 32px; margin-left: auto;
+  border: 0; border-radius: var(--radius-sm); background: none; color: var(--muted); cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.quitar:hover { background: var(--critical-bg); color: var(--critical-ink); }
 .agregar { width: fit-content; }
 .resumen {
-  margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 13px;
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); font-size: 14px;
   background: var(--info-bg); color: var(--info-ink);
 }
+.icono-resumen { flex: none; margin-top: 2px; }
 .resumen.error { background: var(--critical-bg); color: var(--critical-ink); }
 </style>

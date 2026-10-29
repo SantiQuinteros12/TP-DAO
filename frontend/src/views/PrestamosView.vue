@@ -12,6 +12,7 @@ import TypeAhead from '../components/TypeAhead.vue'
 import { buscar, catalogoApi, prestamosApi, sedesApi, sociosApi } from '../services/api'
 import { ejecutar, useToast } from '../composables/useToast'
 import { etiqueta, fecha, moneda } from '../composables/formato'
+import { ArrowRight, Building2, Plus, Repeat, Truck } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -183,12 +184,15 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Préstamos</h1>
-      <button class="btn btn-primary" @click="abrirSolicitud()">+ Nueva solicitud</button>
+      <div>
+        <h1>Préstamos</h1>
+        <p>Solicitudes locales e interbibliotecarias, entregas, devoluciones y multas.</p>
+      </div>
+      <button class="btn btn-primary" @click="abrirSolicitud()"><Plus aria-hidden="true" /> Nueva solicitud</button>
     </header>
 
     <div class="card">
-      <div class="toolbar" style="margin-bottom: 12px">
+      <div class="toolbar filtros">
         <select v-model="filtros.estado">
           <option value="">Todos los estados</option>
           <option v-for="e in ESTADOS" :key="e" :value="e">{{ etiqueta(e) }}</option>
@@ -202,39 +206,46 @@ onMounted(async () => {
           <option value="">Todas las sedes</option>
           <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
-        <label class="toolbar small"><input v-model="filtros.vencidos" type="checkbox" style="width: auto" /> Sólo vencidos</label>
-        <span class="small muted" style="margin-left: auto">{{ prestamos.length }} préstamos</span>
+        <label class="interruptor"><input v-model="filtros.vencidos" type="checkbox" /> Sólo vencidos</label>
+        <span class="contador">{{ prestamos.length }} préstamos</span>
       </div>
 
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>#</th><th>Socio</th><th>Libro</th><th>Tipo</th><th>Origen → Destino</th>
-              <th>Vencimiento</th><th>Estado</th><th class="num">Multa</th><th />
+              <th class="num">#</th><th>Socio</th><th>Libro</th><th>Tipo</th><th>Origen → Destino</th>
+              <th>Vencimiento</th><th>Estado</th><th class="num">Multa</th><th><span class="sr-only">Acciones</span></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="p in prestamos" :key="p.id">
-              <td class="muted">{{ p.id }}</td>
-              <td>{{ p.socio }}</td>
-              <td>{{ p.titulo }}<br /><span class="small muted mono">{{ p.codigo_inventario }}</span></td>
-              <td class="small">{{ etiqueta(p.tipo) }}</td>
-              <td class="small">
-                <template v-if="p.tipo === 'LOCAL'">{{ p.sede_origen }}</template>
-                <template v-else>{{ p.sede_origen }} → {{ p.sede_destino }}</template>
+            <tr v-for="p in prestamos" :key="p.id" :class="{ vencida: p.vencido }">
+              <td class="num id">{{ p.id }}</td>
+              <td class="socio">{{ p.socio }}</td>
+              <td class="libro">
+                <span class="titulo">{{ p.titulo }}</span>
+                <span class="mono codigo">{{ p.codigo_inventario }}</span>
               </td>
-              <td class="small">
-                {{ fecha(p.fecha_vencimiento) }}
-                <div v-if="p.vencido" class="small" style="color: var(--critical-ink)">{{ p.dias_atraso }} días de atraso</div>
+              <td>
+                <span class="tipo" :class="p.tipo === 'LOCAL' ? 'local' : 'interbib'" :title="etiqueta(p.tipo)">
+                  <component :is="p.tipo === 'LOCAL' ? Building2 : Repeat" :size="13" aria-hidden="true" />{{ p.tipo === 'LOCAL' ? 'Local' : 'Interbib.' }}
+                </span>
+              </td>
+              <td class="ruta">
+                <template v-if="p.tipo === 'LOCAL'">{{ p.sede_origen }}</template>
+                <template v-else>{{ p.sede_origen }} <ArrowRight class="flecha" :size="13" aria-label="hacia" /> {{ p.sede_destino }}</template>
+              </td>
+              <td class="vencimiento">
+                <span class="tabular">{{ fecha(p.fecha_vencimiento) }}</span>
+                <span v-if="p.vencido" class="atraso">{{ p.dias_atraso }} días de atraso</span>
               </td>
               <td><EstadoBadge :estado="p.vencido ? 'VENCIDO' : p.estado" /></td>
               <td class="num">{{ p.multa_estimada ? moneda(p.multa_estimada) : '—' }}</td>
               <td class="actions">
-                <div class="btn-group" style="justify-content: flex-end">
+                <div class="btn-group acciones">
                   <button v-if="p.estado === 'LISTO_PARA_RETIRO'" class="btn btn-sm btn-primary" @click="entregar(p)">Entregar</button>
                   <button v-if="p.estado === 'ACTIVO'" class="btn btn-sm" @click="abrirDevolucion(p)">Devolución</button>
-                  <button v-if="p.tipo === 'INTERBIBLIOTECARIO'" class="btn btn-sm" @click="verRemito(p)">Remito</button>
+                  <button v-if="p.tipo === 'INTERBIBLIOTECARIO'" class="btn btn-sm btn-ghost" @click="verRemito(p)"><Truck aria-hidden="true" /> Remito</button>
                   <button v-if="['PENDIENTE_ENVIO', 'LISTO_PARA_RETIRO'].includes(p.estado)" class="btn btn-sm btn-danger" @click="abrirCancelacion(p)">Cancelar</button>
                 </div>
               </td>
@@ -328,20 +339,21 @@ onMounted(async () => {
     <!-- Devolución -->
     <ModalDialog v-if="devolviendo" titulo="Registrar devolución" @cerrar="devolviendo = null">
       <form class="form" @submit.prevent="confirmarDevolucion">
-        <p>
-          <strong>{{ devolviendo.titulo }}</strong> ({{ devolviendo.codigo_inventario }})<br />
-          <span class="muted">{{ devolviendo.socio }} · venció el {{ fecha(devolviendo.fecha_vencimiento) }}</span>
-        </p>
+        <div class="resumen-prestamo">
+          <strong>{{ devolviendo.titulo }}</strong>
+          <span class="mono codigo">{{ devolviendo.codigo_inventario }}</span>
+          <span class="muted small">{{ devolviendo.socio }} · vence el {{ fecha(devolviendo.fecha_vencimiento) }}</span>
+        </div>
         <p v-if="devolviendo.vencido" class="alert warning">
           {{ devolviendo.dias_atraso }} días de atraso · multa por atraso estimada {{ moneda(devolviendo.multa_estimada) }}
           (política {{ devolviendo.politica_multa }}).
         </p>
         <fieldset class="field condiciones">
           <span>Estado físico del material <b class="req">*</b></span>
-          <label v-for="c in ['BUENA', 'DETERIORADA', 'DANADA']" :key="c" class="opcion">
-            <input v-model="devolucion.condicion" type="radio" :value="c" style="width: auto" />
-            {{ etiqueta(c) }}
-            <small class="muted">{{ { BUENA: 'sin recargo', DETERIORADA: '+ $2.000', DANADA: '+ $15.000, queda fuera de circulación' }[c] }}</small>
+          <label v-for="c in ['BUENA', 'DETERIORADA', 'DANADA']" :key="c" class="opcion" :class="[c.toLowerCase(), { elegida: devolucion.condicion === c }]">
+            <input v-model="devolucion.condicion" type="radio" :value="c" />
+            <span class="nombre-opcion">{{ etiqueta(c) }}</span>
+            <small>{{ { BUENA: 'sin recargo', DETERIORADA: '+ $2.000', DANADA: '+ $15.000, queda fuera de circulación' }[c] }}</small>
           </label>
         </fieldset>
         <label class="field"><span>Observaciones</span><textarea v-model="devolucion.observaciones" rows="2" maxlength="300" /></label>
@@ -358,13 +370,16 @@ onMounted(async () => {
     <!-- Cancelación -->
     <ModalDialog v-if="cancelando" titulo="Cancelar préstamo" @cerrar="cancelando = null">
       <form class="form" novalidate @submit.prevent="confirmarCancelacion">
-        <p>Préstamo #{{ cancelando.id }} — {{ cancelando.titulo }} para {{ cancelando.socio }}.</p>
+        <div class="resumen-prestamo">
+          <strong>{{ cancelando.titulo }}</strong>
+          <span class="muted small">Préstamo #{{ cancelando.id }} · {{ cancelando.socio }}</span>
+        </div>
         <CampoForm etiqueta="Motivo" requerido :error="motivo && motivoInvalido ? 'Mínimo 3 caracteres' : ''">
           <input v-model="motivo" maxlength="200" />
         </CampoForm>
         <div class="form-actions">
           <button type="button" class="btn" @click="cancelando = null">Volver</button>
-          <button class="btn btn-primary" :disabled="motivoInvalido">Cancelar préstamo</button>
+          <button class="btn btn-danger btn-danger-solid" :disabled="motivoInvalido">Cancelar préstamo</button>
         </div>
       </form>
     </ModalDialog>
@@ -372,13 +387,64 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.condiciones { border: 0; padding: 0; margin: 0; }
-.opcion {
-  display: flex; gap: 8px; align-items: center; padding: 8px 10px;
-  border: 1px solid var(--grid); border-radius: 8px; cursor: pointer;
+.filtros { margin-bottom: var(--space-4); }
+.interruptor {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface);
+  font-size: 14px; font-weight: 550; color: var(--ink-2); cursor: pointer; user-select: none;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.opcion small { margin-left: auto; }
-.resto { display: grid; gap: 12px; border: 0; padding: 0; margin: 0; min-width: 0; }
-.resto:disabled { opacity: 0.55; }
+.interruptor:hover { background: var(--surface-2); }
+.interruptor:has(input:checked) { background: var(--critical-bg); border-color: var(--critical); color: var(--critical-ink); }
+.contador {
+  margin-left: auto; padding: 4px 10px; border-radius: var(--radius-pill);
+  background: var(--surface-2); font-size: var(--text-sm); font-weight: 550; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabla */
+.id { color: var(--muted); font-size: var(--text-sm); width: 1%; }
+.socio { font-weight: 550; min-width: 120px; }
+.libro { min-width: 160px; }
+.libro .titulo { display: block; font-weight: 550; color: var(--ink); }
+.codigo { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.tipo {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: var(--radius-sm);
+  font-size: var(--text-xs); font-weight: 600; white-space: nowrap;
+  background: var(--surface-2); color: var(--ink-2);
+}
+.tipo.interbib { background: var(--accent-soft); color: var(--accent); }
+.ruta { font-size: var(--text-sm); color: var(--ink-2); min-width: 150px; }
+.flecha { vertical-align: -2px; color: var(--muted); margin: 0 2px; }
+.vencimiento { white-space: nowrap; font-size: var(--text-sm); }
+.atraso { display: block; margin-top: 2px; font-size: var(--text-xs); font-weight: 650; color: var(--critical-ink); }
+tr.vencida td:first-child { box-shadow: inset 3px 0 0 var(--critical); }
+.acciones { justify-content: flex-end; gap: 6px; }
+td.actions { white-space: normal; width: 1%; min-width: 120px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Modales */
+.resumen-prestamo {
+  display: grid; gap: 2px; padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md); background: var(--surface-2); border: 1px solid var(--border);
+}
+.resumen-prestamo .codigo { margin-top: 0; }
+
+.condiciones { display: grid; gap: var(--space-2); }
+.opcion {
+  --tono: var(--good); --tono-bg: var(--good-bg);
+  display: flex; gap: var(--space-3); align-items: center; padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); cursor: pointer;
+  transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.opcion.deteriorada { --tono: var(--warning); --tono-bg: var(--warning-bg); }
+.opcion.danada { --tono: var(--critical); --tono-bg: var(--critical-bg); }
+.opcion:hover { border-color: var(--tono); }
+.opcion.elegida { border-color: var(--tono); background: var(--tono-bg); box-shadow: inset 0 0 0 1px var(--tono); }
+.nombre-opcion { font-weight: 600; }
+.opcion small { margin-left: auto; color: var(--ink-2); font-size: var(--text-sm); text-align: right; }
+
+.resto { display: grid; gap: var(--space-4); min-width: 0; }
 .faltante { margin-right: auto; align-self: center; }
+@media (max-width: 520px) { .faltante { flex: 1 1 100%; } }
 </style>

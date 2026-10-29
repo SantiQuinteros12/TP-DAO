@@ -12,6 +12,7 @@ import { sedesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
 import { r, useValidacion } from '../composables/validacion'
 import { copiarFranjas, errorHorario } from '../composables/horario'
+import { Building2, Clock, Mail, MapPin, Pencil, Phone, Plus, Power, RotateCcw } from 'lucide-vue-next'
 
 const sedes = ref([])
 const provincias = ref([])
@@ -86,15 +87,18 @@ onMounted(async () => {
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Sedes de la red</h1>
-      <button class="btn btn-primary" @click="abrir()">+ Nueva sede</button>
+      <div>
+        <h1>Sedes de la red</h1>
+        <p>Bibliotecas que integran la red: ubicación, contacto y horario de atención.</p>
+      </div>
+      <button class="btn btn-primary" @click="abrir()"><Plus aria-hidden="true" /> Nueva sede</button>
     </header>
 
     <div class="card">
       <div class="card-header">
         <h2>{{ visibles.length }} sedes</h2>
-        <label class="toolbar small">
-          <input v-model="mostrarBajas" type="checkbox" style="width: auto" /> Mostrar dadas de baja
+        <label class="interruptor">
+          <input v-model="mostrarBajas" type="checkbox" /> Mostrar dadas de baja
         </label>
       </div>
       <div class="table-wrap">
@@ -103,17 +107,25 @@ onMounted(async () => {
             <tr><th>Nombre</th><th>Dirección</th><th>Contacto</th><th>Horario</th><th>Estado</th><th /></tr>
           </thead>
           <tbody>
-            <tr v-for="s in visibles" :key="s.id">
-              <td><strong>{{ s.nombre }}</strong></td>
-              <td class="small">{{ s.direccion_texto }}</td>
-              <td class="small">{{ s.telefono }}<br /><span class="muted">{{ s.email }}</span></td>
-              <td class="small horario-celda">{{ s.horario_texto }}</td>
+            <tr v-for="s in visibles" :key="s.id" :class="{ dada_de_baja: !s.activa }">
+              <td>
+                <div class="sede">
+                  <span class="icono-sede" aria-hidden="true"><Building2 :size="18" /></span>
+                  <span class="nombre">{{ s.nombre }}</span>
+                </div>
+              </td>
+              <td class="con-icono"><MapPin :size="14" aria-hidden="true" /><span>{{ s.direccion_texto }}</span></td>
+              <td class="contacto">
+                <span v-if="s.telefono"><Phone :size="14" aria-hidden="true" /> {{ s.telefono }}</span>
+                <span v-if="s.email" class="muted"><Mail :size="14" aria-hidden="true" /> {{ s.email }}</span>
+              </td>
+              <td class="con-icono horario-celda"><Clock :size="14" aria-hidden="true" /><span>{{ s.horario_texto }}</span></td>
               <td><EstadoBadge :estado="s.activa ? 'ACTIVA' : 'BAJA'" /></td>
               <td class="actions">
-                <div class="btn-group" style="justify-content: flex-end">
-                  <button class="btn btn-sm" @click="abrir(s)">Editar</button>
+                <div class="btn-group derecha">
+                  <button class="btn btn-sm btn-ghost" @click="abrir(s)"><Pencil aria-hidden="true" /> Editar</button>
                   <button class="btn btn-sm" :class="{ 'btn-danger': s.activa }" @click="cambiarEstado(s)">
-                    {{ s.activa ? 'Dar de baja' : 'Reactivar' }}
+                    <component :is="s.activa ? Power : RotateCcw" aria-hidden="true" /> {{ s.activa ? 'Dar de baja' : 'Reactivar' }}
                   </button>
                 </div>
               </td>
@@ -141,8 +153,8 @@ onMounted(async () => {
           </CampoForm>
         </div>
 
-        <div class="field">
-          <span>Horario de atención</span>
+        <div class="field bloque">
+          <span class="bloque-titulo"><Clock :size="15" aria-hidden="true" /> Horario de atención</span>
           <HorarioEditor v-model="form.horario" />
         </div>
 
@@ -156,5 +168,34 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.horario-celda { max-width: 240px; }
+.interruptor {
+  display: inline-flex; align-items: center; gap: var(--space-2); min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface);
+  font-size: 14px; font-weight: 550; color: var(--ink-2); cursor: pointer; user-select: none;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.interruptor:hover { background: var(--surface-2); }
+.interruptor:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+.sede { display: flex; align-items: center; gap: var(--space-3); min-width: 170px; }
+.icono-sede {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.nombre { font-weight: 600; color: var(--ink); }
+tr.dada_de_baja .icono-sede { background: var(--surface-2); color: var(--muted); }
+tr.dada_de_baja .nombre { color: var(--muted); }
+
+.con-icono { font-size: var(--text-sm); color: var(--ink-2); }
+.con-icono svg { float: left; margin: 3px 6px 0 0; color: var(--muted); }
+.con-icono span { display: block; overflow: hidden; }
+.contacto { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; }
+.contacto span { display: flex; align-items: center; gap: 6px; }
+.contacto svg { color: var(--muted); flex: none; }
+.horario-celda { max-width: 260px; }
+.derecha { justify-content: flex-end; flex-wrap: nowrap; }
+
+.bloque { padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius); gap: var(--space-3); }
+.bloque-titulo { display: inline-flex; align-items: center; gap: 6px; }
+.bloque-titulo svg { color: var(--accent); }
 </style>

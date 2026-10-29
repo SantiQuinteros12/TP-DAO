@@ -16,11 +16,21 @@ defineProps({
 
 <style scoped>
 .tile {
-  display: grid; gap: 2px; padding: 14px 16px; min-width: 0;
+  position: relative; display: grid; gap: var(--space-1); align-content: start;
+  padding: var(--space-4) var(--space-5); min-width: 0; overflow: hidden;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow);
 }
-.etiqueta { font-size: 12.5px; color: var(--ink-2); }
-.valor { font-size: 26px; font-weight: 600; line-height: 1.2; }
-.detalle { font-size: 12px; color: var(--muted); }
+.tile::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent);
+}
+.etiqueta {
+  font-size: var(--text-xs); font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.valor {
+  font-size: 30px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em;
+  color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.detalle { font-size: var(--text-sm); color: var(--muted); }
 </style>

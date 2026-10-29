@@ -108,19 +108,20 @@ const pct = (v) => `${v.toLocaleString('es-AR', { maximumFractionDigits: 1 })}%`
 </template>
 
 <style scoped>
-.donut { position: relative; display: grid; grid-template-columns: minmax(130px, 170px) 1fr; gap: 16px; align-items: center; }
+.donut { position: relative; display: grid; grid-template-columns: minmax(110px, 140px) minmax(0, 1fr); gap: var(--space-4); align-items: center; }
 @media (max-width: 420px) { .donut { grid-template-columns: 1fr; justify-items: center; } }
-.grafico { position: relative; width: 100%; max-width: 170px; }
+.grafico { position: relative; width: 100%; max-width: 160px; }
 .donut .empty { grid-column: 1 / -1; }
 svg { display: block; width: 100%; height: auto; overflow: visible; }
-.porcion { cursor: pointer; transition: stroke-width 0.12s, opacity 0.12s; }
+.porcion { cursor: pointer; transition: stroke-width var(--dur) var(--ease), opacity var(--dur) var(--ease); }
 .porcion.atenuada { opacity: 0.45; }
-.total { font-size: 24px; font-weight: 650; fill: var(--ink); }
-.unidad { font-size: 11px; fill: var(--muted); }
+.total { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; fill: var(--ink); }
+.unidad { font-size: 12px; fill: var(--muted); }
 .leyenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; min-width: 0; width: 100%; }
 .leyenda li {
-  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 48px; gap: 8px; align-items: center;
-  padding: 4px 6px; border-radius: 6px; font-size: 12.5px; color: var(--ink-2);
+  display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 46px; gap: 6px 8px; align-items: center;
+  padding: 5px 8px; border-radius: var(--radius-sm); font-size: var(--text-sm); color: var(--ink-2);
+  transition: background var(--dur) var(--ease);
 }
 .leyenda li.activa { background: var(--surface-2); color: var(--ink); }
 .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

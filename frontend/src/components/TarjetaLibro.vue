@@ -2,6 +2,8 @@
 /**
  * Tarjeta de un libro recomendado: afinidad, motivos y disponibilidad.
  */
+import { BookOpen, Bookmark, Check, CircleCheck, Clock, Library } from 'lucide-vue-next'
+
 defineProps({
   libro: { type: Object, required: true },
   posicion: { type: Number, required: true },
@@ -29,19 +31,19 @@ defineEmits(['similares'])
 
     <div class="chips">
       <span v-if="libro.genero" class="chip">{{ libro.genero }}</span>
-      <span class="chip">{{ libro.prestamos_total }} préstamos</span>
+      <span class="chip"><BookOpen :size="12" aria-hidden="true" /> {{ libro.prestamos_total }} préstamos</span>
     </div>
 
     <ul class="motivos">
-      <li v-for="m in libro.motivos.filter((x) => !x.startsWith('Disponible'))" :key="m">{{ m }}</li>
+      <li v-for="m in libro.motivos.filter((x) => !x.startsWith('Disponible'))" :key="m"><Check :size="14" aria-hidden="true" /> {{ m }}</li>
     </ul>
 
     <footer>
       <p v-if="libro.disponibles" class="estado ok">
-        <span aria-hidden="true">●</span> Disponible en {{ libro.sedes_disponibles.join(', ') }}
+        <CircleCheck :size="15" aria-hidden="true" /> Disponible en {{ libro.sedes_disponibles.join(', ') }}
       </p>
       <p v-else class="estado sin">
-        <span aria-hidden="true">▲</span> Sin ejemplares libres ahora
+        <Clock :size="15" aria-hidden="true" /> Sin ejemplares libres ahora
       </p>
       <div class="btn-group">
         <RouterLink
@@ -49,10 +51,10 @@ defineEmits(['similares'])
           class="btn btn-sm btn-primary"
           :to="{ path: '/prestamos', query: { socio_id: socioId, isbn: libro.isbn } }"
         >
-          Pedir préstamo
+          <BookOpen aria-hidden="true" /> Pedir préstamo
         </RouterLink>
-        <RouterLink v-else-if="socioId" class="btn btn-sm" to="/reservas">Reservar</RouterLink>
-        <button type="button" class="btn btn-sm" @click="$emit('similares', libro)">Similares</button>
+        <RouterLink v-else-if="socioId" class="btn btn-sm" to="/reservas"><Bookmark aria-hidden="true" /> Reservar</RouterLink>
+        <button type="button" class="btn btn-sm btn-ghost" @click="$emit('similares', libro)"><Library aria-hidden="true" /> Similares</button>
       </div>
     </footer>
   </article>
@@ -60,23 +62,29 @@ defineEmits(['similares'])
 
 <style scoped>
 .tarjeta {
-  display: grid; gap: 10px; align-content: start; padding: 14px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+  display: grid; gap: var(--space-3); align-content: start; padding: var(--space-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
-header { display: flex; gap: 10px; align-items: flex-start; }
+.tarjeta:hover { border-color: var(--accent-soft-2); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+header { display: flex; gap: var(--space-3); align-items: flex-start; }
 .posicion {
-  flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
-  background: var(--accent-soft); color: var(--info-ink); font-weight: 650; font-size: 13px;
+  flex: none; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+  background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: var(--text-sm);
 }
 .titulos { display: grid; gap: 2px; min-width: 0; }
-h3 { font-size: 14.5px; }
-.afinidad { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; }
-.medidor { height: 6px; border-radius: 999px; background: var(--grid); overflow: hidden; }
-.medidor span { display: block; height: 100%; background: var(--series-1); border-radius: 999px; }
-.motivos { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; color: var(--ink-2); }
-.motivos li::before { content: '✓ '; color: var(--good-ink); font-weight: 600; }
-footer { display: grid; gap: 8px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--grid); }
-.estado { margin: 0; font-size: 12.5px; }
+h3 { font-size: 15.5px; line-height: 1.3; }
+.afinidad { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; }
+.medidor { height: 6px; border-radius: var(--radius-pill); background: var(--grid); overflow: hidden; }
+.medidor span { display: block; height: 100%; background: var(--series-1); border-radius: var(--radius-pill); transition: width 300ms var(--ease); }
+.afinidad strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+.chips .chip { gap: 4px; }
+.motivos { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: var(--text-sm); color: var(--ink-2); }
+.motivos li { display: flex; align-items: flex-start; gap: 6px; }
+.motivos svg { flex: none; margin-top: 2px; color: var(--good-ink); }
+footer { display: grid; gap: var(--space-3); margin-top: auto; padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.estado { display: flex; align-items: flex-start; gap: 6px; margin: 0; font-size: var(--text-sm); font-weight: 550; }
+.estado svg { flex: none; margin-top: 2px; }
 .estado.ok { color: var(--good-ink); }
 .estado.sin { color: var(--warning-ink); }
 .btn { text-decoration: none; }

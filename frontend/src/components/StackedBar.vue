@@ -41,18 +41,18 @@ const ancho = (valor, total) => (total ? `${(valor / total) * 100}%` : '0%')
 </template>
 
 <style scoped>
-.leyenda { display: flex; flex-wrap: wrap; gap: 6px 14px; list-style: none; margin: 0 0 12px; padding: 0; font-size: 12px; color: var(--ink-2); }
+.leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; list-style: none; margin: 0 0 var(--space-4); padding: 0; font-size: var(--text-sm); color: var(--ink-2); }
 .leyenda li { display: inline-flex; align-items: center; gap: 6px; }
 .muestra { width: 10px; height: 10px; border-radius: 3px; }
-.filas { display: grid; gap: 10px; }
-.fila { display: grid; grid-template-columns: minmax(110px, 30%) 1fr 32px; gap: 10px; align-items: center; }
-.etiqueta { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pila { display: flex; gap: 2px; height: 18px; min-width: 0; }
+.filas { display: grid; gap: var(--space-3); }
+.fila { display: grid; grid-template-columns: minmax(110px, 30%) 1fr 40px; gap: 10px; align-items: center; }
+.etiqueta { font-size: var(--text-sm); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pila { display: flex; gap: 2px; height: 20px; min-width: 0; }
 .segmento { height: 100%; min-width: 3px; }
 .segmento:first-child { border-radius: 4px 0 0 4px; }
 .segmento:last-of-type { border-radius: 0 4px 4px 0; }
 .segmento:only-of-type { border-radius: 4px; }
 .segmento:hover { filter: brightness(1.12); }
 .vacio { align-self: center; }
-.total { text-align: right; font-variant-numeric: tabular-nums; }
+.total { text-align: right; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 </style>

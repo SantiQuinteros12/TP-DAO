@@ -11,6 +11,7 @@ import TarjetaLibro from '../components/TarjetaLibro.vue'
 import TypeAhead from '../components/TypeAhead.vue'
 import { buscar, recomendacionesApi } from '../services/api'
 import { ejecutar } from '../composables/useToast'
+import { BookHeart, LoaderCircle, Sparkles, TrendingUp, UserRound } from 'lucide-vue-next'
 
 const socioId = ref(null)
 const resultado = ref(null)
@@ -38,10 +39,14 @@ onMounted(() => cargar())
 <template>
   <section class="page">
     <header class="page-header">
-      <h1>Recomendaciones</h1>
+      <div>
+        <h1>Recomendaciones</h1>
+        <p>Sugerencias de lectura según el historial de cada socio, sus autores y géneros preferidos.</p>
+      </div>
     </header>
 
     <div class="card buscador">
+      <span class="buscador-icono" aria-hidden="true"><UserRound :size="20" /></span>
       <label class="field">
         <span>Recomendar para el socio</span>
         <TypeAhead
@@ -58,10 +63,13 @@ onMounted(() => cargar())
     <div v-if="resultado" class="contenido">
       <!-- Perfil del lector -->
       <aside v-if="resultado.socio" class="card perfil">
-        <h2>{{ resultado.socio }}</h2>
+        <div class="perfil-titulo">
+          <span class="buscador-icono" aria-hidden="true"><UserRound :size="18" /></span>
+          <h2>{{ resultado.socio }}</h2>
+        </div>
         <template v-if="resultado.personalizado">
           <div>
-            <h3>Géneros que lee</h3>
+            <h3 class="subtitulo">Géneros que lee</h3>
             <ul class="barras-perfil">
               <li v-for="g in resultado.perfil.generos" :key="g.genero">
                 <span>{{ g.genero }}</span>
@@ -71,7 +79,7 @@ onMounted(() => cargar())
             </ul>
           </div>
           <div>
-            <h3>Autores frecuentes</h3>
+            <h3 class="subtitulo">Autores frecuentes</h3>
             <div class="chips">
               <span v-for="a in resultado.perfil.autores" :key="a.autor" class="chip">{{ a.autor }} <strong>{{ a.cantidad }}</strong></span>
             </div>
@@ -88,9 +96,10 @@ onMounted(() => cargar())
 
       <div class="principal">
         <h2 class="seccion">
+          <component :is="resultado.personalizado ? Sparkles : TrendingUp" :size="20" aria-hidden="true" />
           {{ resultado.personalizado ? 'Te recomendamos' : 'Tendencias en la red' }}
         </h2>
-        <p v-if="cargando" class="empty">Calculando…</p>
+        <p v-if="cargando" class="calculando"><LoaderCircle class="girando" :size="18" aria-hidden="true" /> Calculando…</p>
         <div v-else class="grilla">
           <TarjetaLibro
             v-for="(l, i) in resultado.recomendaciones"
@@ -108,7 +117,7 @@ onMounted(() => cargar())
     <!-- Si te gustó… -->
     <div id="similares" class="card">
       <div class="card-header">
-        <h2>Si te gustó…</h2>
+        <h2 class="seccion"><BookHeart :size="20" aria-hidden="true" /> Si te gustó…</h2>
         <div class="buscar-libro">
           <TypeAhead
             v-model="libroIsbn"
@@ -138,21 +147,43 @@ onMounted(() => cargar())
 </template>
 
 <style scoped>
-.buscador { max-width: 640px; }
-.contenido { display: grid; gap: 20px; grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); align-items: start; }
+.buscador { display: flex; align-items: flex-end; gap: var(--space-3); max-width: 680px; }
+.buscador .field { flex: 1; }
+.buscador-icono {
+  display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent);
+}
+.contenido { display: grid; gap: var(--space-5); grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); align-items: start; }
 .contenido:not(:has(.perfil)) { grid-template-columns: 1fr; }
 @media (max-width: 900px) { .contenido { grid-template-columns: 1fr; } }
-.perfil { display: grid; gap: 16px; position: sticky; top: 20px; }
-.perfil h3 { margin-bottom: 8px; }
-.barras-perfil { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12.5px; }
-.barras-perfil li { display: grid; grid-template-columns: 80px 1fr 24px; gap: 8px; align-items: center; }
-.pista { height: 8px; border-radius: 999px; background: var(--grid); overflow: hidden; }
-.pista span { display: block; height: 100%; background: var(--series-1); border-radius: 999px; }
-.barras-perfil strong { text-align: right; font-variant-numeric: tabular-nums; }
-.leidos { margin: 8px 0 0; padding-left: 18px; color: var(--ink-2); }
-details summary { cursor: pointer; color: var(--muted); }
-.principal { display: grid; gap: 12px; min-width: 0; }
-.seccion { font-size: 16px; }
-.grilla { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+/* Perfil del lector */
+.perfil { display: grid; gap: var(--space-5); position: sticky; top: var(--space-5); }
+.perfil-titulo { display: flex; align-items: center; gap: var(--space-3); }
+.perfil-titulo .buscador-icono { width: 36px; height: 36px; }
+.subtitulo {
+  margin-bottom: var(--space-2); font-size: var(--text-xs); font-weight: 650; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.barras-perfil { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); font-size: var(--text-sm); }
+.barras-perfil li { display: grid; grid-template-columns: 90px 1fr 28px; gap: var(--space-2); align-items: center; color: var(--ink-2); }
+.pista { height: 8px; border-radius: var(--radius-pill); background: var(--grid); overflow: hidden; }
+.pista span { display: block; height: 100%; background: var(--series-1); border-radius: var(--radius-pill); transition: width 300ms var(--ease); }
+.barras-perfil strong { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.leidos { margin: var(--space-2) 0 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 2px; }
+details summary { cursor: pointer; color: var(--accent); font-weight: 550; }
+details summary:hover { color: var(--accent-hover); }
+
+/* Recomendaciones */
+.principal { display: grid; gap: var(--space-4); min-width: 0; }
+.seccion { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xl); }
+.seccion svg { color: var(--accent); }
+.calculando { display: flex; align-items: center; justify-content: center; gap: var(--space-2); padding: var(--space-8); color: var(--muted); }
+.girando { animation: girar 0.8s linear infinite; }
+.grilla { display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
 .buscar-libro { flex: 1 1 260px; max-width: 420px; }
+#similares .grilla { margin-top: var(--space-2); }
+
+@keyframes girar { to { transform: rotate(360deg); } }
+@media (max-width: 520px) { .buscador .buscador-icono { display: none; } }
 </style>
