@@ -19,6 +19,17 @@ class CondicionFisica(str, Enum):
     DETERIORADA = "DETERIORADA"
     DANADA = "DANADA"
 
+    @property
+    def gravedad(self):
+        return list(CondicionFisica).index(self)
+
+    def peor(self, otra):
+        """La más grave entre ambas (``otra`` puede ser None)."""
+        if otra is None:
+            return self
+        otra = CondicionFisica(otra)
+        return otra if otra.gravedad > self.gravedad else self
+
 
 class TipoPrestamo(str, Enum):
     LOCAL = "LOCAL"

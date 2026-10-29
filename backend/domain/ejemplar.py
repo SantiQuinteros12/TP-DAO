@@ -4,6 +4,10 @@ Entidad EjemplarFisico.
 El ciclo de vida del ejemplar es acotado y sus estados no cambian el
 comportamiento del objeto, sólo restringen transiciones; por eso se modela
 con una tabla de transiciones (a diferencia del Remito, que usa State).
+
+La condición física es independiente del estado (disponibilidad) y sólo
+puede empeorar: viajes y devoluciones nunca la mejoran. La única forma de
+volver a BUENA es ``reparar``.
 """
 
 from domain.enums import CondicionFisica, EstadoEjemplar
@@ -85,7 +89,7 @@ class Ejemplar:
         :param quedar_reservado: True si llega para un préstamo pendiente
         """
         self.sede_actual_id = sede_id
-        self.condicion = CondicionFisica(condicion)
+        self._degradar(condicion)
         if self.condicion == CondicionFisica.DANADA:
             self._cambiar_estado(E.DANADO)
         elif quedar_reservado:
@@ -98,7 +102,7 @@ class Ejemplar:
         :param queda_retenido: True si debe retornar a su sede propietaria
                                (queda reservado para el remito de retorno)
         """
-        self.condicion = CondicionFisica(condicion)
+        self._degradar(condicion)
         if self.condicion == CondicionFisica.DANADA and not queda_retenido:
             self._cambiar_estado(E.DANADO)
         elif queda_retenido:
@@ -106,8 +110,13 @@ class Ejemplar:
         else:
             self._cambiar_estado(E.DISPONIBLE)
 
+    def _degradar(self, condicion):
+        """Aplica la condición informada sólo si es peor que la actual."""
+        self.condicion = self.condicion.peor(condicion)
+
     def reparar(self):
-        self.condicion = CondicionFisica.DETERIORADA
+        """Única operación que restituye la condición BUENA."""
+        self.condicion = CondicionFisica.BUENA
         self._cambiar_estado(E.DISPONIBLE)
 
     def dar_de_baja(self):

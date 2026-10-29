@@ -112,6 +112,43 @@ class TestPrestamoInterbibliotecario:
         mensajes = [n.mensaje for n in ctx.socios.notificaciones(ctx.ana.id)]
         assert any("ya podés retirarlo" in m for m in mensajes)
 
+    def _devolver_y_retornar(self, ctx, condicion, recepcion=None):
+        p = ctx.prestamos.solicitar(ctx.ana.id, ctx.ej_central.id,
+                                    ctx.central.id, ctx.norte.id)
+        ctx.completar_envio(ctx.remito_de(p))
+        ctx.prestamos.entregar(p.id)
+        ctx.prestamos.registrar_devolucion(p.id, condicion)
+        retorno = ctx.remito_de(p, "RETORNO")
+        for op in ("empaquetar", "despachar"):
+            ctx.logistica.operar(retorno.id, op)
+        ctx.logistica.operar(retorno.id, "recibir", condicion=recepcion)
+        return ctx.uow.remitos.obtener(retorno.id)
+
+    def test_retorno_sin_condicion_conserva_el_dano(self, ctx):
+        retorno = self._devolver_y_retornar(ctx, "DANADA")
+        ej = ctx.ejemplar(ctx.ej_central)
+        assert ej.condicion.value == "DANADA"
+        assert ej.estado == EstadoEjemplar.DANADO
+        assert ej.sede_actual_id == ctx.central.id
+        assert retorno.condicion_recepcion == "DANADA"
+
+    def test_el_viaje_no_mejora_la_condicion(self, ctx):
+        self._devolver_y_retornar(ctx, "DETERIORADA", recepcion="BUENA")
+        ej = ctx.ejemplar(ctx.ej_central)
+        assert ej.condicion.value == "DETERIORADA"
+        assert ej.estado == EstadoEjemplar.DISPONIBLE
+
+    def test_el_viaje_si_puede_empeorar_la_condicion(self, ctx):
+        self._devolver_y_retornar(ctx, "BUENA", recepcion="DANADA")
+        assert ctx.ejemplar(ctx.ej_central).estado == EstadoEjemplar.DANADO
+
+    def test_solo_reparar_restituye_buena(self, ctx):
+        self._devolver_y_retornar(ctx, "DANADA", recepcion="BUENA")
+        assert ctx.ejemplar(ctx.ej_central).condicion.value == "DANADA"
+        ej = ctx.catalogo.reparar_ejemplar(ctx.ej_central.id)
+        assert ej.condicion.value == "BUENA"
+        assert ej.estado == EstadoEjemplar.DISPONIBLE
+
     def test_cancelar_antes_de_despachar_libera_ejemplar(self, ctx):
         p = ctx.prestamos.solicitar(ctx.ana.id, ctx.ej_central.id,
                                     ctx.central.id, ctx.norte.id)

@@ -65,6 +65,7 @@ def remito(r, uow=None):
         ej = uow.ejemplares.obtener(r.ejemplar_id)
         datos.update(
             codigo_inventario=ej.codigo_inventario,
+            condicion_ejemplar=ej.condicion.value,
             titulo=uow.libros.obtener(ej.isbn).titulo,
             sede_origen=uow.sedes.obtener(r.sede_origen_id).nombre,
             sede_destino=uow.sedes.obtener(r.sede_destino_id).nombre)

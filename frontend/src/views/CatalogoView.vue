@@ -129,13 +129,37 @@ const vLibro = useValidacion(formLibro, {
   anio_publicacion: [r.anio()],
   genero: [r.nombre(), r.maximo(60)]
 })
-const generos = computed(() => [...new Set(libros.value.map((l) => l.genero).filter(Boolean))].sort())
+
+/**
+ * Géneros del catálogo completo (no sólo de los libros filtrados por la
+ * búsqueda). Se elige con un desplegable que siempre muestra todas las
+ * opciones; "Otro…" habilita escribir un género nuevo.
+ */
+const OTRO_GENERO = '__otro__'
+const generosCatalogo = ref([])
+const generoElegido = ref('')
+const generos = computed(() => {
+  const lista = new Set(generosCatalogo.value)
+  if (formLibro.genero && generoElegido.value !== OTRO_GENERO) lista.add(formLibro.genero)
+  return [...lista].sort((a, b) => a.localeCompare(b, 'es'))
+})
+
+async function cargarGeneros() {
+  const todos = (await ejecutar(() => catalogoApi.listarLibros(''))) ?? []
+  generosCatalogo.value = [...new Set(todos.map((l) => l.genero).filter(Boolean))]
+}
+
+function elegirGenero() {
+  formLibro.genero = generoElegido.value === OTRO_GENERO ? '' : generoElegido.value
+}
 
 function abrirLibro(libro = {}) {
   const { isbn = '', titulo = '', autor = '', editorial = '', anio_publicacion = null, genero = '' } = libro
-  Object.assign(formLibro, { isbn, titulo, autor, editorial, anio_publicacion, genero })
+  Object.assign(formLibro, { isbn, titulo, autor, editorial, anio_publicacion, genero: genero ?? '' })
+  generoElegido.value = formLibro.genero
   vLibro.reiniciar()
   libroEditando.value = libro
+  cargarGeneros()
 }
 
 async function guardarLibro() {
@@ -383,8 +407,18 @@ onMounted(async () => {
             <input v-model.number="formLibro.anio_publicacion" type="number" min="1000" :max="new Date().getFullYear()" />
           </CampoForm>
           <CampoForm etiqueta="Género" :error="vLibro.error('genero')" @tocar="vLibro.tocar('genero')">
-            <input v-model="formLibro.genero" v-filtro="'nombre'" list="generos" maxlength="60" />
-            <datalist id="generos"><option v-for="g in generos" :key="g" :value="g" /></datalist>
+            <select v-model="generoElegido" @change="elegirGenero">
+              <option value="">Sin género</option>
+              <option v-for="g in generos" :key="g" :value="g">{{ g }}</option>
+              <option :value="OTRO_GENERO">Otro (nuevo)…</option>
+            </select>
+            <input
+              v-if="generoElegido === OTRO_GENERO"
+              v-model="formLibro.genero"
+              v-filtro="'nombre'"
+              maxlength="60"
+              placeholder="Nombre del nuevo género"
+            />
           </CampoForm>
         </div>
         <div class="form-actions">

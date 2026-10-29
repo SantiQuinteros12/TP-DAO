@@ -116,7 +116,7 @@ class Remito(RegistroEventos):
         self._estado.registrar_checkpoint(self, ctx)
 
     def recibir(self, ctx):
-        ctx.condicion = CondicionFisica(ctx.condicion or CondicionFisica.BUENA)
+        ctx.condicion = CondicionFisica(ctx.condicion) if ctx.condicion else None
         self._estado.recibir(self, ctx)
 
     def reportar_incidencia(self, ctx):

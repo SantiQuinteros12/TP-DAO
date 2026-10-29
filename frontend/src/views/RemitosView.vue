@@ -57,11 +57,20 @@ const CAMPOS = {
 }
 const campos = computed(() => CAMPOS[accion.value] ?? [])
 
+/**
+ * La condición física nunca mejora durante un viaje: al recibir sólo se
+ * ofrecen la condición actual del ejemplar o una peor (el backend también lo
+ * garantiza). Volver a "Buena" requiere "Reparar ejemplar" en el catálogo.
+ */
+const CONDICIONES = ['BUENA', 'DETERIORADA', 'DANADA']
+const condicionActual = computed(() => remito.value?.condicion_ejemplar ?? 'BUENA')
+const condicionesPosibles = computed(() => CONDICIONES.slice(CONDICIONES.indexOf(condicionActual.value)))
+
 function elegirAccion(nombre) {
   accion.value = nombre
   Object.assign(datos, {
     responsable: datos.responsable ?? '',
-    ubicacion: '', observacion: '', tipo_incidencia: 'DEMORA', condicion: 'BUENA'
+    ubicacion: '', observacion: '', tipo_incidencia: 'DEMORA', condicion: condicionActual.value
   })
 }
 
@@ -194,8 +203,12 @@ onMounted(async () => {
               <label v-if="campos.includes('condicion')" class="field">
                 <span>Estado físico al recibir *</span>
                 <select v-model="datos.condicion">
-                  <option v-for="c in ['BUENA', 'DETERIORADA', 'DANADA']" :key="c" :value="c">{{ etiqueta(c) }}</option>
+                  <option v-for="c in condicionesPosibles" :key="c" :value="c">{{ etiqueta(c) }}</option>
                 </select>
+                <small v-if="condicionActual !== 'BUENA'" class="muted">
+                  El ejemplar viaja {{ etiqueta(condicionActual).toLowerCase() }}: no puede recibirse en mejor estado.
+                  Para volver a «Buena» usá «Reparar» en el catálogo.
+                </small>
               </label>
               <label class="field">
                 <span>Observación<b v-if="requiereObservacion" class="req"> *</b></span>

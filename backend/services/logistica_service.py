@@ -85,6 +85,11 @@ class LogisticaService(ServicioBase):
             ubicacion=ubicacion, observacion=observacion,
             tipo_incidencia=tipo_incidencia,
             condicion=CondicionFisica(condicion) if condicion else None)
+        if operacion == "recibir":
+            # El viaje no mejora el material: se registra la peor condición
+            # entre la que traía el ejemplar y la informada (si hay).
+            ejemplar = self.uow.ejemplares.obtener(remito.ejemplar_id)
+            ctx.condicion = ejemplar.condicion.peor(ctx.condicion)
         getattr(remito, operacion)(ctx)
         self.uow.remitos.guardar(remito)
         self._aplicar_efectos(remito, ctx)
